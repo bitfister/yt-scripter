@@ -1,0 +1,8 @@
+anthropic>=0.40.0
+youtube-transcript-api>=1.0.0
+scrapetube>=2.6.0
+flask>=3.0.0
+python-dotenv>=1.0.0
+pyngrok>=7.5.0
+trendspy>=0.1.6
+gunicorn>=22.0.0

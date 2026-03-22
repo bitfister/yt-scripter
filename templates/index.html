@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Scripter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e8e8e8;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #ff4444, #ff8800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #888; margin-bottom: 32px; }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 14px 18px;
+            font-size: 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: #ff4444; }
+        input[type="number"] {
+            width: 80px;
+            padding: 14px 12px;
+            font-size: 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            text-align: center;
+            outline: none;
+        }
+        select {
+            padding: 14px 12px;
+            font-size: 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            outline: none;
+            cursor: pointer;
+        }
+        button {
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #ff4444, #ff6600);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .trending-section {
+            margin-bottom: 28px;
+        }
+        .trending-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .trending-header h3 {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .trending-category-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .trending-category-select {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #ccc;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .trending-category-select:hover { border-color: #555; }
+        .trending-category-select:focus { border-color: #ff6600; outline: none; }
+        .trending-tabs {
+            display: flex;
+            gap: 4px;
+        }
+        .trending-tab {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #888;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .trending-tab:hover { border-color: #555; color: #ccc; }
+        .trending-tab.active { border-color: #ff6600; color: #ff6600; }
+        .trending-chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            min-height: 36px;
+            align-items: center;
+        }
+        .trending-chip {
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 20px;
+            color: #ddd;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .trending-chip:hover {
+            border-color: #ff6600;
+            color: #ff8800;
+            background: #1f1510;
+        }
+        .trending-chip .volume {
+            color: #666;
+            font-size: 0.75rem;
+            margin-left: 6px;
+        }
+        .trending-chip .category {
+            color: #555;
+            font-size: 0.7rem;
+            margin-left: 4px;
+        }
+        .trending-loading {
+            color: #555;
+            font-size: 0.85rem;
+        }
+
+        .progress-area {
+            margin: 24px 0;
+            display: none;
+        }
+        .steps {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .step-indicator {
+            flex: 1;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            transition: background 0.3s;
+        }
+        .step-indicator.active { background: #ff6600; }
+        .step-indicator.done { background: #44cc44; }
+        .progress-log {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-line { color: #aaa; }
+        .log-line.current { color: #ff8800; }
+
+        .result-area { display: none; margin-top: 32px; }
+        .sources {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .sources h3 { font-size: 0.9rem; color: #888; margin-bottom: 10px; }
+        .sources a {
+            color: #6ca8ff;
+            text-decoration: none;
+            display: block;
+            padding: 4px 0;
+            font-size: 0.85rem;
+        }
+        .sources a:hover { text-decoration: underline; }
+        .source-meta { color: #666; font-size: 0.8rem; }
+
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .script-header h2 { font-size: 1.2rem; }
+        .copy-btn {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            background: #333;
+            border-radius: 6px;
+        }
+        .copy-btn:hover { background: #444; }
+        .script-output {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 24px;
+            white-space: pre-wrap;
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .video-btn {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            background: linear-gradient(135deg, #6633ff, #aa44ff);
+            border-radius: 6px;
+            color: #fff;
+            font-weight: 600;
+        }
+        .video-btn:hover { opacity: 0.9; }
+        .video-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-group { display: flex; gap: 8px; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .modal-header h2 { font-size: 1.1rem; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .prompt-output {
+            background: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 16px;
+            white-space: pre-wrap;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: #ccc;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            justify-content: flex-end;
+        }
+        .modal-info {
+            color: #888;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+
+        .error-msg {
+            background: #3a1111;
+            border: 1px solid #ff4444;
+            border-radius: 8px;
+            padding: 16px;
+            color: #ff6666;
+            display: none;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YT Scripter</h1>
+        <p class="subtitle">Research top YouTube videos and generate an original script</p>
+
+        <div class="input-row">
+            <input type="text" id="topic" placeholder="Enter a topic (e.g. solar energy, AI music, etc.)" autofocus>
+            <select id="timeRange" title="Upload date filter">
+                <option value="any">Any time</option>
+                <option value="hour">Last hour</option>
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="month" selected>This month</option>
+                <option value="year">This year</option>
+            </select>
+            <input type="number" id="maxVideos" value="{{ max_videos }}" min="1" max="20" title="Max videos">
+            <button id="generateBtn" onclick="generate()">Generate</button>
+        </div>
+
+        <div class="trending-section">
+            <div class="trending-header">
+                <h3>Trending</h3>
+                <div class="trending-tabs">
+                    <div class="trending-tab active" data-period="today" onclick="loadTrending('today', this)">Today</div>
+                    <div class="trending-tab" data-period="week" onclick="loadTrending('week', this)">Week</div>
+                    <div class="trending-tab" data-period="month" onclick="loadTrending('month', this)">Month</div>
+                    <div class="trending-tab" data-period="year" onclick="loadTrending('year', this)">Year</div>
+                </div>
+            </div>
+            <div class="trending-category-row">
+                <select class="trending-category-select" id="trendingCategory" onchange="onCategoryChange()">
+                    <option value="All">All Categories</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Business and Finance">Business & Finance</option>
+                    <option value="Science">Science</option>
+                    <option value="Health">Health</option>
+                    <option value="Politics">Politics</option>
+                    <option value="Law and Government">Law & Government</option>
+                    <option value="Climate">Climate</option>
+                    <option value="Games">Games</option>
+                    <option value="Food and Drink">Food & Drink</option>
+                    <option value="Beauty and Fashion">Beauty & Fashion</option>
+                    <option value="Hobbies and Leisure">Hobbies & Leisure</option>
+                    <option value="Travel and Transportation">Travel</option>
+                    <option value="Autos and Vehicles">Autos & Vehicles</option>
+                    <option value="Jobs and Education">Jobs & Education</option>
+                    <option value="Pets and Animals">Pets & Animals</option>
+                    <option value="Shopping">Shopping</option>
+                </select>
+            </div>
+            <div class="trending-chips" id="trendingChips">
+                <span class="trending-loading">Loading trends...</span>
+            </div>
+        </div>
+
+        <div class="progress-area" id="progressArea">
+            <div class="steps">
+                <div class="step-indicator" id="step1" title="Search"></div>
+                <div class="step-indicator" id="step2" title="Transcripts"></div>
+                <div class="step-indicator" id="step3" title="Summarize"></div>
+                <div class="step-indicator" id="step4" title="Compile"></div>
+            </div>
+            <div class="progress-log" id="progressLog"></div>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+
+        <div class="result-area" id="resultArea">
+            <div class="sources" id="sourcesBox">
+                <h3>SOURCES</h3>
+                <div id="sourcesList"></div>
+            </div>
+            <div class="script-header">
+                <h2>Generated Script</h2>
+                <div class="btn-group">
+                    <button class="copy-btn" onclick="copyScript()">Copy</button>
+                    <button class="video-btn" id="videoBtn" onclick="createVideo()">Create Video</button>
+                </div>
+            </div>
+            <div class="script-output" id="scriptOutput"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="videoModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Remotion Video Prompt</h2>
+                <button class="modal-close" onclick="closeVideoModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="prompt-output" id="remotionPrompt"></div>
+                <div class="modal-info" id="modalInfo"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const topicInput = document.getElementById('topic');
+        const btn = document.getElementById('generateBtn');
+
+        topicInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') generate();
+        });
+
+        // --- Trending topics ---
+        const trendingCache = {};
+
+        function getActiveCategory() {
+            return document.getElementById('trendingCategory').value;
+        }
+
+        function getActivePeriod() {
+            const active = document.querySelector('.trending-tab.active');
+            return active ? active.dataset.period : 'today';
+        }
+
+        function cacheKey(period, category) {
+            return period + '|' + category;
+        }
+
+        async function loadTrending(period, tabEl) {
+            // Update active tab
+            document.querySelectorAll('.trending-tab').forEach(t => t.classList.remove('active'));
+            if (tabEl) tabEl.classList.add('active');
+
+            const category = getActiveCategory();
+            const key = cacheKey(period, category);
+            const chips = document.getElementById('trendingChips');
+
+            // Use cache if available
+            if (trendingCache[key]) {
+                renderChips(trendingCache[key]);
+                return;
+            }
+
+            chips.innerHTML = '<span class="trending-loading">Loading trends...</span>';
+
+            try {
+                const res = await fetch(`/trending?period=${period}&category=${encodeURIComponent(category)}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                trendingCache[key] = data.topics;
+                renderChips(data.topics);
+            } catch (err) {
+                chips.innerHTML = '<span class="trending-loading">Could not load trends</span>';
+            }
+        }
+
+        function renderChips(topics) {
+            const chips = document.getElementById('trendingChips');
+            if (!topics.length) {
+                chips.innerHTML = '<span class="trending-loading">No trends found for this category</span>';
+                return;
+            }
+            chips.innerHTML = topics.map(t => {
+                const cats = t.categories.length ? `<span class="category">${t.categories[0]}</span>` : '';
+                return `<div class="trending-chip" onclick="useTrending(this)" data-keyword="${t.keyword.replace(/"/g, '&quot;')}">
+                    ${t.keyword}<span class="volume">${t.volume}</span>${cats}
+                </div>`;
+            }).join('');
+        }
+
+        function useTrending(chip) {
+            topicInput.value = chip.dataset.keyword;
+            topicInput.focus();
+        }
+
+        function onCategoryChange() {
+            refreshTrending();
+        }
+
+        function refreshTrending() {
+            const period = getActivePeriod();
+            const activeTab = document.querySelector('.trending-tab.active');
+            loadTrending(period, activeTab);
+        }
+
+        // Load today's trends on page load
+        loadTrending('today', document.querySelector('.trending-tab.active'));
+
+        async function generate() {
+            const topic = topicInput.value.trim();
+            if (!topic) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Working...';
+            document.getElementById('progressArea').style.display = 'block';
+            document.getElementById('resultArea').style.display = 'none';
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('progressLog').innerHTML = '';
+
+            // Reset step indicators
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById('step' + i).className = 'step-indicator';
+            }
+
+            let currentStep = 0;
+
+            try {
+                const res = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        topic,
+                        max_videos: document.getElementById('maxVideos').value,
+                        time_range: document.getElementById('timeRange').value,
+                    }),
+                });
+                const {stream_id} = await res.json();
+
+                const evtSource = new EventSource('/stream/' + stream_id);
+
+                evtSource.addEventListener('progress', e => {
+                    const data = JSON.parse(e.data);
+                    // Update step indicators
+                    if (data.step !== currentStep) {
+                        if (currentStep > 0) {
+                            document.getElementById('step' + currentStep).className = 'step-indicator done';
+                        }
+                        currentStep = data.step;
+                        document.getElementById('step' + currentStep).className = 'step-indicator active';
+                    }
+                    addLog(data.message);
+                });
+
+                evtSource.addEventListener('done', e => {
+                    const data = JSON.parse(e.data);
+                    // Mark last step done
+                    document.getElementById('step4').className = 'step-indicator done';
+
+                    // Show sources
+                    const sourcesList = document.getElementById('sourcesList');
+                    sourcesList.innerHTML = data.sources.map(s =>
+                        `<a href="${s.url}" target="_blank">${s.title}</a>
+                         <span class="source-meta">${s.channel} &middot; ${s.views}</span>`
+                    ).join('');
+
+                    // Show script and store for video prompt
+                    document.getElementById('scriptOutput').textContent = data.script;
+                    document.getElementById('resultArea').style.display = 'block';
+                    lastScript = data.script;
+                    lastTopic = topic;
+
+                    addLog('Done! Script saved to: ' + data.saved_to);
+                });
+
+                evtSource.addEventListener('error', e => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        showError(data.message);
+                    } catch {
+                        showError('Connection lost.');
+                    }
+                });
+
+                evtSource.addEventListener('end', () => {
+                    evtSource.close();
+                    btn.disabled = false;
+                    btn.textContent = 'Generate';
+                });
+
+            } catch (err) {
+                showError('Failed to start: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = 'Generate';
+            }
+        }
+
+        function addLog(msg) {
+            const log = document.getElementById('progressLog');
+            // Dim previous lines
+            log.querySelectorAll('.current').forEach(el => el.classList.remove('current'));
+            const line = document.createElement('div');
+            line.className = 'log-line current';
+            line.textContent = msg;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function copyScript() {
+            const text = document.getElementById('scriptOutput').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.script-header .copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        }
+
+        // --- Video prompt generation ---
+        let lastScript = '';
+        let lastTopic = '';
+
+        async function createVideo() {
+            const videoBtn = document.getElementById('videoBtn');
+            videoBtn.disabled = true;
+            videoBtn.textContent = 'Generating...';
+
+            try {
+                const res = await fetch('/video-prompt', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        script: lastScript,
+                        topic: lastTopic,
+                    }),
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                document.getElementById('remotionPrompt').textContent = data.prompt;
+                document.getElementById('modalInfo').textContent =
+                    `Scene data saved to: ${data.saved_to} • ${data.scenes.scenes.length} scenes • ${Math.round(data.scenes.totalDurationFrames / 30)}s total`;
+                document.getElementById('videoModal').classList.add('active');
+            } catch (err) {
+                showError('Video prompt failed: ' + err.message);
+            } finally {
+                videoBtn.disabled = false;
+                videoBtn.textContent = 'Create Video';
+            }
+        }
+
+        function closeVideoModal() {
+            document.getElementById('videoModal').classList.remove('active');
+        }
+
+        function copyPrompt() {
+            const text = document.getElementById('remotionPrompt').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.modal-footer .copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy Prompt', 2000);
+            });
+        }
+
+        // Close modal on overlay click
+        document.getElementById('videoModal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeVideoModal();
+        });
+        // Close modal on Escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeVideoModal();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+{
+  "topic": "AI Warning",
+  "totalDurationFrames": 13950,
+  "fps": 30,
+  "scenes": [
+    {
+      "id": "hook",
+      "type": "hook",
+      "title": "The 300 Million Job Crisis",
+      "narration": "What if I told you that 300 million jobs are about to vanish\u2014and it's not happening in 10 years, it's happening RIGHT NOW? While you were worried about robots taking over factories, AI quietly snuck in through the back door of corporate America. Amazon just cut 30,000 jobs while investing $125 billion in AI. Goldman Sachs admitted their entry-level analysts are redundant. And according to leaked corporate memos, your white-collar job has a 90-day expiration date.",
+      "durationFrames": 2460,
+      "visualCues": [
+        "urgent opening statement",
+        "corporate boardroom imagery",
+        "job statistics overlay",
+        "leaked memo graphics"
+      ],
+      "keyPhrases": [
+        "300 million jobs",
+        "Amazon 30,000 jobs",
+        "$125 billion",
+        "Goldman Sachs",
+        "90-day expiration"
+      ],
+      "transition": "cut",
+      "startFrame": 0
+    },
+    {
+      "id": "intro",
+      "type": "intro",
+      "title": "Three Warning Signs",
+      "narration": "I'm about to show you the three warning signs that prove we're not heading toward an AI job apocalypse\u2014we're already living in it. You'll discover which 'safe' jobs are getting eliminated first, why your college degree might actually make you MORE vulnerable, and the exact strategy that people are using to not just survive this transition, but build six-figure businesses in the process. But first, we need to talk about what's really happening behind those corporate boardroom doors.",
+      "durationFrames": 2610,
+      "visualCues": [
+        "three warning signs graphics",
+        "college degree imagery",
+        "six-figure business visuals",
+        "corporate boardroom scenes"
+      ],
+      "keyPhrases": [
+        "three warning signs",
+        "safe jobs",
+        "college degree",
+        "six-figure businesses",
+        "corporate boardroom"
+      ],
+      "transition": "cut",
+      "startFrame": 2460
+    },
+    {
+      "id": "section-the-stealth-displacement",
+      "type": "section",
+      "title": "The Stealth Displacement",
+      "narration": "Here's what nobody's telling you about AI job replacement: it doesn't happen gradually. Remember Blockbuster? One day they had 9,000 stores, and seemingly overnight, Netflix made them extinct. The same cliff-edge effect is happening right now in corporate America. Amazon's CEO Andy Jassy didn't sugarcoat it\u2014he explicitly stated that AI efficiency gains will reduce corporate headcount. But here's the kicker: while they're cutting 30,000 human jobs, they're planning the highest capital expenditure of any mega-cap company\u2014$125 billion by 2026. That money isn't going to hire more people. It's going to replace them. And this isn't just Amazon. Companies like Atlassian cut 1,600 jobs during their AI restructuring. Wise Tech eliminated 2,000 roles, with executives declaring manual coding 'over.' One law firm reduced their paralegal staff by 60% in just six months. But the most disturbing part? Agencies that used to employ 50 writers now have 5 writers and 45 AI workflows. These aren't distant future predictions\u2014this is happening right now, while everyone's distracted by the latest ChatGPT features.",
+      "durationFrames": 5850,
+      "visualCues": [
+        "Blockbuster vs Netflix comparison",
+        "Andy Jassy statement overlay",
+        "pause for dramatic effect",
+        "corporate restructuring graphics",
+        "agency workflow transformation"
+      ],
+      "keyPhrases": [
+        "9,000 stores",
+        "Andy Jassy",
+        "$125 billion by 2026",
+        "1,600 jobs",
+        "60% reduction"
+      ],
+      "transition": "cut",
+      "startFrame": 5070
+    },
+    {
+      "id": "section-the-white-collar-betrayal",
+      "type": "section",
+      "title": "The White-Collar Betrayal",
+      "narration": "Now here's where it gets really interesting\u2014and terrifying. Everything we thought we knew about job security is backwards. You know those 'safe' white-collar jobs your parents told you to get? The office work, the business analysis, the financial planning? Those are getting hit FIRST, not last. Goldman Sachs\u2014one of the most elite financial institutions on the planet\u2014publicly admitted that AI can do entry-level analyst work. These are jobs that required expensive MBA degrees and used to guarantee six-figure starting salaries. Meanwhile, the plumber fixing your toilet? The electrician rewiring your house? They're sleeping soundly because you can't automate a leaky pipe through a computer screen.",
+      "durationFrames": 3030,
+      "visualCues": [
+        "job security reversal graphics",
+        "white-collar vs blue-collar comparison",
+        "Goldman Sachs admission",
+        "MBA degree imagery",
+        "plumber and electrician visuals"
+      ],
+      "keyPhrases": [
+        "white-collar jobs",
+        "Goldman Sachs",
+        "MBA degrees",
+        "six-figure salaries",
+        "can't automate"
+      ],
+      "transition": "cut",
+      "startFrame": 10920
+    }
+  ]
+}

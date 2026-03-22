@@ -1,0 +1,10 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+output/
+remotion/node_modules/
+remotion/.next/
+.git/
+*.md
