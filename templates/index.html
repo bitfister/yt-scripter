@@ -444,6 +444,7 @@
             <div class="build-progress" id="buildProgress"></div>
             <div class="modal-footer">
                 <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+                <a class="copy-btn" id="downloadBtn" href="/download-remotion" style="display:none;text-decoration:none;text-align:center">Download ZIP</a>
                 <button class="video-btn" id="buildBtn" onclick="buildVideo()">Build Video</button>
             </div>
         </div>
@@ -752,7 +753,8 @@
                 evtSource.addEventListener('done', e => {
                     const data = JSON.parse(e.data);
                     addBuildLog(`✓ Generated ${data.files.length} component files`, 'log-done');
-                    addBuildLog('Run "git pull && npx remotion studio" in remotion/ to preview', 'log-done');
+                    addBuildLog('Click "Download ZIP" or run "git pull" to get files locally', 'log-done');
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
                 });
 
                 evtSource.addEventListener('error', e => {

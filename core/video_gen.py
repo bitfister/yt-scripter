@@ -1,12 +1,14 @@
 """Generate Remotion video components by sending the prompt to Claude API with tool_use."""
 
+import logging
 import os
-import re
-import subprocess
+import time
 
 import anthropic
 
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, API_MAX_RETRIES, API_RETRY_BASE_DELAY
+
+logger = logging.getLogger("yt-scripter")
 
 _app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REMOTION_SRC = os.path.join(_app_dir, "remotion", "src")
@@ -26,7 +28,7 @@ WRITE_FILE_TOOL = {
                 "type": "string",
                 "description": (
                     "Relative path within remotion/src/ "
-                    "(e.g. 'ScriptVideo.tsx', 'scenes/HookScene.tsx', 'components/AnimatedText.tsx')"
+                    "(e.g. 'ScriptVideo.tsx', 'scenes/HookScene.tsx')"
                 ),
             },
             "content": {
@@ -54,18 +56,37 @@ VALID_EXTENSIONS = {".tsx", ".ts", ".css", ".json"}
 def _sanitize_path(path: str) -> str | None:
     """Validate and sanitize a relative path under remotion/src/. Returns None if invalid."""
     path = path.strip().lstrip("/").lstrip("\\")
-    # Reject path traversal
     if ".." in path:
         return None
-    # Check extension
     _, ext = os.path.splitext(path)
     if ext.lower() not in VALID_EXTENSIONS:
         return None
-    # Resolve and confirm it stays under REMOTION_SRC
     full = os.path.normpath(os.path.join(REMOTION_SRC, path))
     if not full.startswith(os.path.normpath(REMOTION_SRC)):
         return None
     return full
+
+
+def _call_claude_with_retry(messages: list, progress_callback=None) -> object:
+    """Call Claude streaming API with exponential backoff retry."""
+    for attempt in range(1, API_MAX_RETRIES + 1):
+        try:
+            with client.messages.stream(
+                model=CLAUDE_MODEL,
+                max_tokens=32000,
+                system=SYSTEM_PROMPT,
+                tools=[WRITE_FILE_TOOL],
+                messages=messages,
+            ) as stream:
+                return stream.get_final_message()
+        except (anthropic.RateLimitError, anthropic.APIConnectionError) as e:
+            if attempt == API_MAX_RETRIES:
+                raise
+            delay = API_RETRY_BASE_DELAY ** attempt
+            logger.warning(f"Claude API attempt {attempt} failed: {e}. Retrying in {delay}s...")
+            if progress_callback:
+                progress_callback(f"API rate limited, retrying in {delay}s...")
+            time.sleep(delay)
 
 
 def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
@@ -88,17 +109,8 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
     _progress("Sending prompt to Claude...")
 
     while True:
-        # Use streaming to avoid Anthropic's 10-minute timeout on long requests
-        with client.messages.stream(
-            model=CLAUDE_MODEL,
-            max_tokens=32000,
-            system=SYSTEM_PROMPT,
-            tools=[WRITE_FILE_TOOL],
-            messages=messages,
-        ) as stream:
-            response = stream.get_final_message()
+        response = _call_claude_with_retry(messages, progress_callback)
 
-        # Process response content blocks
         assistant_content = response.content
         tool_results = []
 
@@ -140,60 +152,14 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
                     "content": "OK",
                 })
 
-        # If no tool calls, Claude is done
         if not tool_results:
             break
 
-        # Continue the agentic loop
         messages.append({"role": "assistant", "content": assistant_content})
         messages.append({"role": "user", "content": tool_results})
 
-        # Also break if Claude signals end_turn with tool results
-        # (shouldn't happen, but safety check)
         if response.stop_reason == "end_turn":
             break
 
     _progress(f"Done — wrote {len(files_written)} files")
-
-    # Auto-sync: commit and push generated files to git
-    _sync_to_git(files_written, _progress)
-
     return files_written
-
-
-def _sync_to_git(files: list[str], progress_callback=None):
-    """Commit and push generated Remotion files so they can be pulled locally."""
-    if not files:
-        return
-
-    def _progress(msg: str):
-        if progress_callback:
-            progress_callback(msg)
-
-    try:
-        # Stage all generated files (components + scene data + images)
-        git_paths = [os.path.join("remotion", "src", f) for f in files]
-        # Also stage scene data and generated images
-        git_paths.append(os.path.join("remotion", "src", "data", "script.json"))
-        images_dir = os.path.join("remotion", "public", "images")
-        if os.path.isdir(os.path.join(_app_dir, images_dir)):
-            git_paths.append(images_dir)
-        subprocess.run(
-            ["git", "add"] + git_paths,
-            cwd=_app_dir, check=True, capture_output=True, text=True,
-        )
-
-        # Commit
-        subprocess.run(
-            ["git", "commit", "-m", "Auto-generated Remotion video components"],
-            cwd=_app_dir, check=True, capture_output=True, text=True,
-        )
-
-        # Push
-        subprocess.run(
-            ["git", "push"],
-            cwd=_app_dir, check=True, capture_output=True, text=True,
-        )
-        _progress("Synced to git — run `git pull` locally")
-    except subprocess.CalledProcessError as e:
-        _progress(f"Git sync failed: {e.stderr.strip() or e.stdout.strip()}")

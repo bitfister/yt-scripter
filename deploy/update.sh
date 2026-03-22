@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cd /home/ubuntu/yt-scripter
-git pull origin main
+git pull origin master
 source venv/bin/activate
 pip install -r requirements.txt
 sudo systemctl restart yt-scripter

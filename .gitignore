@@ -1,6 +1,8 @@
-# Environment
+# Environment & secrets
 .env
 proxies.txt
+.flask_secret
+app.log
 
 # Python
 __pycache__/
@@ -26,3 +28,5 @@ Thumbs.db
 
 Readme.txt
 *.csv
+remotion/public/images/*.png
+.claude/

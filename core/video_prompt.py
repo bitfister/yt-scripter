@@ -223,7 +223,15 @@ def parse_script_to_scenes(script: str, topic: str) -> list[dict]:
     )
     raw = "[" + message.content[0].text
     raw = _extract_json_array(raw)
-    return json.loads(raw)
+    try:
+        scenes = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse scene JSON from Claude: {e}. Raw length: {len(raw)} chars") from e
+
+    if not isinstance(scenes, list) or len(scenes) == 0:
+        raise ValueError(f"Expected a non-empty list of scenes, got: {type(scenes).__name__}")
+
+    return scenes
 
 
 def generate_remotion_prompt(script: str, topic: str) -> dict:
