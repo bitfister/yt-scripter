@@ -533,6 +533,30 @@
         // Load today's trends on page load
         loadTrending('today', document.querySelector('.trending-tab.active'));
 
+        // Auto-restore last generated script (survives page refresh)
+        (async function loadLastResult() {
+            try {
+                const res = await fetch('/last-result');
+                const data = await res.json();
+                if (!data.found) return;
+
+                lastScript = data.script;
+                lastTopic = data.topic;
+                topicInput.value = data.topic;
+
+                // Show sources
+                const sourcesList = document.getElementById('sourcesList');
+                sourcesList.innerHTML = data.sources.map(s =>
+                    `<a href="${s.url}" target="_blank">${s.title}</a>
+                     <span class="source-meta">${s.channel} &middot; ${s.views}</span>`
+                ).join('');
+
+                // Show script
+                document.getElementById('scriptOutput').textContent = data.script;
+                document.getElementById('resultArea').style.display = 'block';
+            } catch (_) {}
+        })();
+
         async function generate() {
             const topic = topicInput.value.trim();
             if (!topic) return;

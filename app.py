@@ -138,6 +138,50 @@ def trending():
         return {"error": str(e)}, 500
 
 
+@app.route("/last-result")
+def last_result():
+    """Return the most recent generated script so the UI can resume after a refresh."""
+    import glob
+    output_dir = os.path.join(_app_dir, "output")
+    files = sorted(glob.glob(os.path.join(output_dir, "*.md")), key=os.path.getmtime, reverse=True)
+    if not files:
+        return {"found": False}
+
+    path = files[0]
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Extract topic from filename: Topic_Name_20260322_125905.md
+    basename = os.path.splitext(os.path.basename(path))[0]
+    # Remove timestamp suffix (_YYYYMMDD_HHMMSS)
+    topic = "_".join(basename.split("_")[:-2]).replace("_", " ")
+
+    # Extract script (after "## Script\n")
+    script = ""
+    if "## Script" in content:
+        script = content.split("## Script\n", 1)[-1].strip()
+
+    # Extract sources
+    sources = []
+    if "## Sources" in content:
+        src_block = content.split("## Sources\n", 1)[-1].split("\n---")[0].strip()
+        for line in src_block.split("\n"):
+            line = line.strip()
+            if line.startswith("- ["):
+                try:
+                    title = line.split("[")[1].split("]")[0]
+                    url = line.split("(")[1].split(")")[0]
+                    rest = line.split("—", 1)[-1].strip() if "—" in line else ""
+                    parts = rest.rsplit("(", 1)
+                    channel = parts[0].strip() if len(parts) > 1 else ""
+                    views = parts[1].rstrip(")") if len(parts) > 1 else ""
+                    sources.append({"title": title, "url": url, "channel": channel, "views": views})
+                except (IndexError, ValueError):
+                    pass
+
+    return {"found": True, "topic": topic, "script": script, "sources": sources, "saved_to": path}
+
+
 @app.route("/video-prompt", methods=["POST"])
 def video_prompt():
     data = request.json
