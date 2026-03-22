@@ -713,7 +713,7 @@
                 const res = await fetch('/generate-video', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ prompt: lastPrompt }),
+                    body: JSON.stringify({ script: lastScript, topic: lastTopic }),
                 });
                 const { stream_id, error } = await res.json();
                 if (error) throw new Error(error);

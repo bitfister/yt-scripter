@@ -25,6 +25,7 @@ from core.compile import compile_script
 from core.trending import get_trending
 from core.video_prompt import generate_remotion_prompt
 from core.video_gen import generate_video_components
+from core.image_gen import generate_scene_images
 from cli import save_script
 
 app = Flask(__name__, template_folder=os.path.join(_app_dir, "templates"))
@@ -165,12 +166,37 @@ def video_prompt():
         return {"error": str(e)}, 500
 
 
-def _video_worker(prompt: str, q: queue.Queue):
-    """Run Remotion component generation in a background thread."""
+def _video_worker(script: str, topic: str, q: queue.Queue):
+    """Run full video generation pipeline: parse → images → components → sync."""
     try:
         def on_progress(msg):
             _send(q, "progress", {"step": 1, "message": msg})
 
+        # Step 1: Parse script into scenes with visual segments
+        on_progress("Parsing script into visual scenes...")
+        result = generate_remotion_prompt(script, topic)
+        scene_data = result["scenes"]
+
+        # Save scene JSON
+        data_dir = os.path.join(_app_dir, "remotion", "src", "data")
+        os.makedirs(data_dir, exist_ok=True)
+        with open(os.path.join(data_dir, "script.json"), "w", encoding="utf-8") as f:
+            json.dump(scene_data, f, indent=2)
+        on_progress(f"Parsed {len(scene_data['scenes'])} scenes with visual segments")
+
+        # Step 2: Generate DALL-E images for each scene
+        on_progress("Generating AI images for scenes...")
+        generate_scene_images(scene_data["scenes"], topic, progress_callback=on_progress)
+
+        # Re-save scene data with imagePath fields added
+        with open(os.path.join(data_dir, "script.json"), "w", encoding="utf-8") as f:
+            json.dump(scene_data, f, indent=2)
+
+        # Step 3: Regenerate prompt with updated scene data (now includes imagePaths)
+        prompt = result["prompt"]
+
+        # Step 4: Generate Remotion components via Claude
+        on_progress("Generating Remotion components...")
         files = generate_video_components(prompt, progress_callback=on_progress)
         _send(q, "done", {"files": files})
     except Exception as e:
@@ -182,13 +208,14 @@ def _video_worker(prompt: str, q: queue.Queue):
 @app.route("/generate-video", methods=["POST"])
 def generate_video():
     data = request.json
-    prompt = data.get("prompt", "").strip()
+    script = data.get("script", "").strip()
+    topic = data.get("topic", "").strip()
 
-    if not prompt:
-        return {"error": "Prompt is required"}, 400
+    if not script or not topic:
+        return {"error": "Script and topic are required"}, 400
 
     qid, q = _new_queue()
-    thread = threading.Thread(target=_video_worker, args=(prompt, q), daemon=True)
+    thread = threading.Thread(target=_video_worker, args=(script, topic, q), daemon=True)
     thread.start()
 
     return {"stream_id": qid}

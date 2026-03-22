@@ -6,3 +6,4 @@ python-dotenv>=1.0.0
 pyngrok>=7.5.0
 trendspy>=0.1.6
 gunicorn>=22.0.0
+openai>=1.0.0

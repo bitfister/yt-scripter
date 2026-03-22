@@ -1,4 +1,4 @@
-"""Parse a generated script into structured scene data and produce a Remotion skill prompt."""
+"""Parse a generated script into structured scene data with visual segments and produce a Remotion composition prompt."""
 
 import json
 import anthropic
@@ -6,145 +6,195 @@ from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-PARSE_SYSTEM = """You are a video production assistant. You parse YouTube scripts into structured scene data for a React-based video framework (Remotion).
+# ---------- Scene Parsing ----------
 
-Given a script with [HOOK], [INTRO], [SECTION: title], [OUTRO] markers, timestamps, and stage directions in parentheses, you produce a JSON array of scenes.
+PARSE_SYSTEM = """You are a video production director. You transform YouTube scripts into structured scene data for a motion graphics video framework (Remotion).
 
-Rules for timing:
-- Narration pace: ~150 words per minute = ~2.5 words per second
-- At 30fps, 1 second = 30 frames
-- Calculate durationFrames from word count: ceil(wordCount / 2.5) * 30
-- Add 60 extra frames (2 seconds) for scenes with (pause) stage directions
-- Minimum scene duration: 90 frames (3 seconds)
+The video is a VISUAL COMPANION to voice-over narration. The narration will be read aloud as audio — it is NEVER displayed on screen as text paragraphs.
 
-Rules for visual cues:
-- Extract all (parenthetical stage directions) as visual cues
-- Identify key phrases: numbers, statistics, bold claims, proper nouns
-- Assign a transition type: "cut" for high-energy scenes, "fade" for reflective/outro
+Your job is to decide WHAT VISUALS should appear on screen to illustrate each part of the narration.
+
+## Rules for scenes
+- Break the script into scenes using [HOOK], [INTRO], [SECTION: title], [OUTRO] markers
+- Each scene gets a mood, accent color, and DALL-E image prompt
+- Calculate durationFrames from narration word count: ceil(wordCount / 2.5) * 30
+
+## Rules for segments (the core visual decisions)
+- Break each scene into 3-8 visual segments
+- Each segment is ONE visual beat — what the viewer sees for 7-20 seconds
+- Segment durations should sum to approximately the scene durationFrames
+- Each segment has exactly one visualType from the catalog below
+
+## Visual Type Catalog
+
+| visualType | Required fields | Use for |
+|---|---|---|
+| headline | headline (max 10 words) | Opening a scene, key thesis statements |
+| stat_highlight | value, label, emphasis ("normal"/"danger"/"success") | Statistics, numbers, percentages |
+| comparison | leftLabel, rightLabel, leftItems[], rightItems[] | Before/after, this vs that, pros vs cons |
+| timeline | events[{label, year?}] | Chronological events, predictions, progression |
+| icon_list | title, items[] (max 6 items) | Lists of features, factors, categories |
+| quote | text (max 20 words), attribution? | Powerful statements, expert quotes |
+| warning | text (max 8 words), severity ("caution"/"danger"/"critical") | Alarms, alerts, urgent messages |
+| reveal | value, label | Dramatic single-stat full-screen reveal |
+
+## Rules for imagePrompt
+- Describe a cinematic visual scene that captures the emotional essence of this scene
+- Focus on atmosphere, objects, lighting — NOT text or UI elements
+- Example: "A humanoid robot in a dark laboratory, its face split between friendly smile and cold mechanical interior, dramatic side lighting"
 
 Return ONLY valid JSON, no markdown fences."""
 
-PARSE_PROMPT = """Parse this script into scene JSON. Return an array of scene objects.
+PARSE_PROMPT = """Parse this script into scenes with visual segments.
 
-Each scene object must have:
-- "id": kebab-case identifier (e.g. "hook", "intro", "section-the-stealth-displacement")
-- "type": one of "hook", "intro", "section", "outro"
-- "title": display title for the scene
-- "narration": the full narration text for this scene (no stage directions, no markers)
-- "durationFrames": calculated from word count as described
-- "visualCues": array of visual direction strings extracted from stage directions + inferred
-- "keyPhrases": array of key phrases/stats to highlight visually (max 5 per scene)
+Return an array of scene objects. Each scene must have:
+- "id": kebab-case (e.g. "hook", "section-the-timeline")
+- "type": "hook" | "intro" | "section" | "outro"
+- "title": display title
+- "durationFrames": calculated from narration word count
 - "transition": "cut" or "fade"
+- "mood": "tense" | "calm" | "energetic" | "dark" | "warning" | "hopeful"
+- "colorAccent": hex color that fits the mood (e.g. "#ff4400" for tense, "#44aaff" for calm)
+- "imagePrompt": cinematic image description for DALL-E (scene atmosphere, no text)
+- "narration": full narration text (for voice-over, NEVER displayed on screen)
+- "segments": array of visual segments, each with:
+  - "startOffset": frames from scene start
+  - "durationFrames": 200-600 frames (7-20 seconds)
+  - "visualType": one from the catalog
+  - Plus the required fields for that visualType
+
+Example segment for a statistic:
+{{"startOffset": 300, "durationFrames": 400, "visualType": "stat_highlight", "value": "73%", "label": "of researchers surveyed express concern", "emphasis": "danger"}}
+
+Example segment for a comparison:
+{{"startOffset": 700, "durationFrames": 500, "visualType": "comparison", "leftLabel": "Before", "rightLabel": "After", "leftItems": ["Manual process", "3 days"], "rightItems": ["Automated", "3 minutes"]}}
 
 SCRIPT:
 {script}"""
 
-# The Remotion skill prompt template - this is what gets copy-pasted into Claude Code
-REMOTION_PROMPT_TEMPLATE = """I need you to build a complete Remotion video composition for a YouTube video titled "{topic}".
+
+# ---------- Remotion Composition Prompt ----------
+
+REMOTION_PROMPT_TEMPLATE = """Build a Remotion video composition for "{topic}".
 
 ## Scene Data
-Here is the structured scene data (JSON). Use this as the source of truth for all content and timing:
-
 ```json
 {scenes_json}
 ```
 
-## Architecture
-Build these files in `remotion/src/`:
+## Pre-Built Component Library
+These components ALREADY exist in `../components/`. Import them from '../components'. Do NOT rewrite or modify them.
 
-1. **`data/script.json`** — Already saved (the JSON above)
-2. **`ScriptVideo.tsx`** — Main composition component that imports scene data and renders scenes as `<Sequence>` blocks
-3. **`scenes/HookScene.tsx`** — Bold, attention-grabbing kinetic typography
-4. **`scenes/IntroScene.tsx`** — Clean intro with topic title and preview of what's covered
-5. **`scenes/SectionScene.tsx`** — Content sections with text reveal and key phrase highlights
-6. **`scenes/OutroScene.tsx`** — CTA with subscribe prompt and summary
-7. **`components/AnimatedText.tsx`** — Reusable word-by-word or line-by-line text reveal
-8. **`components/KeyPhrase.tsx`** — Highlighted stat/phrase with scale-up animation
-9. **`components/SectionTitle.tsx`** — Slide-in lower-third title bar
-10. **`Root.tsx`** — Update to register the composition with correct total duration and 1920x1080 resolution
+### Available Components & Props:
 
-## Visual Style
-- **Resolution:** 1920×1080 at 30fps
-- **Background:** Dark gradient (near-black to dark gray, e.g., `#0a0a0a` → `#1a1a1a`)
-- **Primary text:** White (#ffffff), large sans-serif font (system-ui or Inter if available)
-- **Accent color:** Vibrant orange-red (#ff4400) for highlights, key phrases, and progress elements
-- **Secondary accent:** Warm amber (#ff8800) for section titles
-- **Font sizes:** Hook text 64-80px, section narration 36-42px, key phrases 48-56px, section titles 28px
+**ParticleField** — Animated floating particle background
+  Props: count?, color?, speed?, opacity?, maxSize?, direction? ('up'|'down'|'random')
 
-## Animation Patterns
-Use these Remotion primitives:
+**GradientBackground** — Mood-driven animated gradient with accent glow
+  Props: mood? ('tense'|'calm'|'energetic'|'dark'|'warning'|'hopeful'), colorAccent?, animationIntensity? ('low'|'medium'|'high')
 
-### Hook Scene
-- Dramatic text entrance: use `spring()` with `damping: 12, mass: 0.5` for scale-up from 0
-- Key phrases appear one at a time with `interpolate(frame, [startFrame, startFrame+15], [0, 1])` for opacity
-- Slight continuous zoom: `interpolate(frame, [0, durationInFrames], [1, 1.05])` on the background
-- Text shadow/glow effect on accent-colored words
+**AnimatedCounter** — Number counting up with spring easing
+  Props: from?, to (number), startFrame?, durationFrames?, format? ('number'|'percent'|'currency'|'multiplier'), suffix?, prefix?, color?, fontSize?
 
-### Section Scenes
-- Section title slides in from left using `spring()` for translateX, stays for 90 frames, then fades
-- Narration text appears line-by-line (split by sentences), each line fading in with 20-frame stagger
-- Key phrases get special treatment: scale up briefly to 1.1x with accent color, then settle back
-- Subtle background gradient shift between sections for visual variety
+**StatHighlight** — Big statistic value with label, animated entrance
+  Props: value (string), label (string), emphasis? ('normal'|'danger'|'success'), startFrame?, durationFrames?, color?
 
-### Intro Scene
-- Topic title fades in centered, large
-- Bullet points of "what you'll learn" slide in from right, staggered by 30 frames each
-- Use the section titles from the scene data as the bullet points
+**ComparisonLayout** — Two-column side-by-side comparison
+  Props: leftLabel, rightLabel, leftItems[], rightItems[], startFrame?, style? ('side-by-side'|'versus'), leftColor?, rightColor?
 
-### Outro Scene
-- Key takeaway text centered with fade-in
-- "Subscribe" CTA with pulsing animation using `spring()` with `config: {{ damping: 5 }}`
-- Fade to black over last 60 frames
+**TimelineBar** — Animated timeline with sequential event dots
+  Props: events ({{label, year?}}[]), startFrame?, orientation? ('horizontal'|'vertical'), color?
 
-### Transitions
-- Between scenes: 15-frame crossfade (overlap sequences by 15 frames, use opacity interpolation)
-- "cut" transitions: no overlap, instant switch
-- "fade" transitions: 30-frame overlap with opacity crossfade
+**IconGrid** — Items appearing in staggered grid with monogram icons
+  Props: title?, items (string[]), startFrame?, columns? (2|3|4), iconStyle? ('circle'|'pill'|'card'), color?
 
-## Component Details
+**QuoteCard** — Styled quote with typewriter reveal effect
+  Props: text, attribution?, startFrame?, style? ('elegant'|'bold'|'warning'), color?
 
-### `ScriptVideo.tsx`
+**WarningBanner** — Alert banner with hazard stripes and optional screen shake
+  Props: text, startFrame?, durationFrames?, severity? ('caution'|'danger'|'critical'), color?
+
+**LowerThird** — Broadcast-style title bar overlay
+  Props: title, subtitle?, startFrame?, durationFrames?, position? ('left'|'center'), accentColor?
+
+**KineticHeadline** — Large kinetic text (MAX 10 WORDS), auto-sized
+  Props: text, startFrame?, durationFrames?, style? ('impact'|'elegant'|'glitch'), color?, fontSize?
+
+**ProgressBar** — Thin video progress indicator
+  Props: color?, position? ('top'|'bottom'), height?
+
+## Background Images
+Each scene has a DALL-E generated background image. Use Remotion's `staticFile()` to load them:
+```tsx
+import {{ Img, staticFile }} from 'remotion';
+// In the scene component:
+<Img src={{staticFile(scene.imagePath)}} style={{...}} />
 ```
-- Import scene data from './data/script.json'
-- Calculate cumulative startFrame for each scene
-- Render each scene inside <Sequence from={{startFrame}} durationInFrames={{scene.durationFrames}}>
-- Pass scene data as props to the appropriate scene component based on scene.type
-```
+If `scene.imagePath` is null, fall back to GradientBackground only.
 
-### `AnimatedText.tsx`
-```
-Props: {{ text: string, startFrame: number, style?: 'word-by-word' | 'line-by-line' | 'fade-in' }}
-- Split text into units (words or sentences based on style)
-- Each unit gets opacity interpolation: interpolate(frame - startFrame, [i * stagger, i * stagger + 15], [0, 1], {{ extrapolateRight: 'clamp' }})
-- line-by-line: split on periods/newlines, 20-frame stagger
-- word-by-word: split on spaces, 3-frame stagger (for hook impact)
-```
+## Files to Create
 
-### `KeyPhrase.tsx`
-```
-Props: {{ text: string, delay: number, color?: string }}
-- Appears at delay frame with spring() scale from 0.8 to 1
-- Brief 1.1x overshoot then settle
-- Accent color background pill/highlight
-- Large bold font
-```
+1. **`ScriptVideo.tsx`** — Main composition
+   - Import scene data from './data/script.json'
+   - Render each scene inside `<Sequence from={{scene.startFrame}} durationInFrames={{scene.durationFrames}}>`
+   - Include `<ProgressBar />` across the full video
+   - Route to the correct scene component by `scene.type`
 
-## Important Remotion Notes
-- Use `useCurrentFrame()` and `useVideoConfig()` hooks
-- All animations driven by frame number, not CSS animations
-- Use `<AbsoluteFill>` for full-screen layouts
-- Import spring from 'remotion': `import {{ spring, useCurrentFrame, useVideoConfig, interpolate, Sequence, AbsoluteFill }} from 'remotion'`
-- Tailwind CSS is configured — you can use Tailwind classes
-- Total composition duration = sum of all scene durationFrames (check the JSON)
+2. **`scenes/HookScene.tsx`** — Attention-grabbing opening
+   - Background: image (with slow Ken Burns zoom) + GradientBackground overlay (opacity 0.6) + ParticleField
+   - Render segments using library components
+   - Use WarningBanner or KineticHeadline with 'glitch' style for maximum impact
 
-Build all components now. Make sure the video tells a compelling visual story that matches the energy and pacing of the narration text."""
+3. **`scenes/IntroScene.tsx`** — Topic intro with preview
+   - Background: image + gradient overlay + particles
+   - LowerThird with topic title
+   - IconGrid showing what sections will cover (use section titles from scene data)
+
+4. **`scenes/SectionScene.tsx`** — Content sections (most important - handles all section scenes)
+   - Background: image (Ken Burns pan/zoom) + GradientBackground overlay + ParticleField
+   - Read `scene.segments` array and render EACH segment inside a `<Sequence>`:
+   ```tsx
+   {{scene.segments.map(seg => (
+     <Sequence key={{seg.startOffset}} from={{seg.startOffset}} durationInFrames={{seg.durationFrames}}>
+       {{seg.visualType === 'stat_highlight' && <StatHighlight value={{seg.value}} label={{seg.label}} emphasis={{seg.emphasis}} />}}
+       {{seg.visualType === 'comparison' && <ComparisonLayout leftLabel={{seg.leftLabel}} ... />}}
+       {{seg.visualType === 'timeline' && <TimelineBar events={{seg.events}} />}}
+       {{seg.visualType === 'headline' && <KineticHeadline text={{seg.headline}} />}}
+       {{seg.visualType === 'icon_list' && <IconGrid title={{seg.title}} items={{seg.items}} />}}
+       {{seg.visualType === 'quote' && <QuoteCard text={{seg.text}} attribution={{seg.attribution}} />}}
+       {{seg.visualType === 'warning' && <WarningBanner text={{seg.text}} severity={{seg.severity}} />}}
+       {{seg.visualType === 'reveal' && <StatHighlight value={{seg.value}} label={{seg.label}} emphasis="danger" />}}
+     </Sequence>
+   ))}}
+   ```
+   - Add LowerThird with scene title at the beginning of each section
+
+5. **`scenes/OutroScene.tsx`** — Closing with CTA
+   - Background: image + gradient + particles
+   - QuoteCard with key takeaway
+   - KineticHeadline with call-to-action
+   - Fade to black over last 60 frames
+
+6. **`Root.tsx`** — Register composition
+   - Import ScriptVideo, set 1920x1080 at 30fps
+   - Set durationInFrames from scriptData.totalDurationFrames
+
+## CRITICAL VISUAL RULES
+1. NEVER display narration text on screen. Narration is for voice-over ONLY.
+2. On-screen text: ONLY headlines (max 10 words), stat values, labels, and short titles.
+3. EVERY scene must have: background image (or gradient fallback) + ParticleField for depth.
+4. Use scene.mood and scene.colorAccent to configure GradientBackground and component colors.
+5. Ken Burns effect on background images: slow zoom (1.0 → 1.08) or slow pan using interpolate.
+6. Visual layering order: image bg → gradient overlay (0.5-0.7 opacity) → particles → main content → LowerThird.
+
+Build all files now. Import components from '../components'."""
 
 
 def parse_script_to_scenes(script: str, topic: str) -> list[dict]:
-    """Use Claude to parse a generated script into structured scene data."""
+    """Use Claude to parse a generated script into structured scene data with visual segments."""
     message = client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=4096,
+        max_tokens=8192,
         system=PARSE_SYSTEM,
         messages=[
             {"role": "user", "content": PARSE_PROMPT.format(script=script)},
@@ -152,17 +202,16 @@ def parse_script_to_scenes(script: str, topic: str) -> list[dict]:
         ],
     )
     raw = "[" + message.content[0].text
-    # Strip any trailing markdown fences just in case
     raw = raw.strip().rstrip("`").strip()
     return json.loads(raw)
 
 
 def generate_remotion_prompt(script: str, topic: str) -> dict:
-    """Generate structured scene data and a Remotion skill prompt.
+    """Generate structured scene data and a Remotion composition prompt.
 
     Returns dict with:
-      - scenes: list of scene dicts
-      - prompt: ready-to-paste Remotion skill prompt string
+      - scenes: scene data dict with scenes array and metadata
+      - prompt: ready-to-use Remotion composition prompt string
     """
     scenes = parse_script_to_scenes(script, topic)
 

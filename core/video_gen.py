@@ -40,8 +40,13 @@ WRITE_FILE_TOOL = {
 
 SYSTEM_PROMPT = (
     "You are a Remotion/React expert. Use the write_file tool to create each component file. "
-    "Write all files needed to build the video composition. Do not explain — just write the files."
+    "Write all files needed to build the video composition. Do not explain — just write the files. "
+    "IMPORTANT: The components/ directory contains pre-built library components. "
+    "Do NOT overwrite files in components/ — import and use them as-is."
 )
+
+# Protected paths: library components that should not be overwritten
+PROTECTED_PREFIXES = ("components/",)
 
 VALID_EXTENSIONS = {".tsx", ".ts", ".css", ".json"}
 
@@ -85,7 +90,7 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
     while True:
         response = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=16000,
+            max_tokens=32000,
             system=SYSTEM_PROMPT,
             tools=[WRITE_FILE_TOOL],
             messages=messages,
@@ -107,6 +112,16 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
                         "type": "tool_result",
                         "tool_use_id": block.id,
                         "content": f"Error: invalid path '{rel_path}'",
+                    })
+                    continue
+
+                # Protect library components from being overwritten
+                if any(rel_path.startswith(p) for p in PROTECTED_PREFIXES) and os.path.exists(full_path):
+                    _progress(f"Skipped protected: {rel_path}")
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": f"PROTECTED: '{rel_path}' is a library component. Import and use it, do not rewrite.",
                     })
                     continue
 
@@ -154,8 +169,13 @@ def _sync_to_git(files: list[str], progress_callback=None):
             progress_callback(msg)
 
     try:
-        # Stage all generated files (paths are relative to remotion/src/)
+        # Stage all generated files (components + scene data + images)
         git_paths = [os.path.join("remotion", "src", f) for f in files]
+        # Also stage scene data and generated images
+        git_paths.append(os.path.join("remotion", "src", "data", "script.json"))
+        images_dir = os.path.join("remotion", "public", "images")
+        if os.path.isdir(os.path.join(_app_dir, images_dir)):
+            git_paths.append(images_dir)
         subprocess.run(
             ["git", "add"] + git_paths,
             cwd=_app_dir, check=True, capture_output=True, text=True,
