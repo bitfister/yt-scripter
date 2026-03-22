@@ -17,7 +17,7 @@ from config import MAX_VIDEOS
 
 # Auth credentials (password stored as hash only)
 AUTH_USER = "admin"
-AUTH_HASH = "scrypt:32768:8:1$RN0j9QwVo2k2J2Xg$1d58a4b973d124d7f26a35624d6e1c47179f4f1e1eabf4f057d73a3488e8ecee2e81b87081a7b926d4dc3b81ffc79372ee31527e7457e3b097c6e1a83a04f6b6"
+AUTH_HASH = "scrypt:32768:8:1$57T8L6siHrHIxzmx$56532e145e46f52124758e3ab91f139eb94c4bb6dbf3b7c9f52cbbfca11d62c6848966ade9e04dc9d62f5580d51e0059afe14957a47ac3394e463c7ad2026c98"
 from core.search import search_videos
 from core.transcript import fetch_all_transcripts
 from core.summarize import summarize_video
