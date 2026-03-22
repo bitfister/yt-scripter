@@ -1,6 +1,7 @@
 """Parse a generated script into structured scene data with visual segments and produce a Remotion composition prompt."""
 
 import json
+import re
 import anthropic
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 
@@ -190,11 +191,30 @@ If `scene.imagePath` is null, fall back to GradientBackground only.
 Build all files now. Import components from '../components'."""
 
 
+def _extract_json_array(text: str) -> str:
+    """Extract a valid JSON array from text that may contain trailing garbage."""
+    # Find the outermost matching brackets
+    depth = 0
+    start = text.index("[")
+    for i, ch in enumerate(text[start:], start):
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    # Fallback: strip common trailing junk
+    text = text.strip()
+    text = re.sub(r'```\s*$', '', text).strip()
+    text = re.sub(r'[^}\]]+$', '', text).strip()
+    return text
+
+
 def parse_script_to_scenes(script: str, topic: str) -> list[dict]:
     """Use Claude to parse a generated script into structured scene data with visual segments."""
     message = client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=8192,
+        max_tokens=16384,
         system=PARSE_SYSTEM,
         messages=[
             {"role": "user", "content": PARSE_PROMPT.format(script=script)},
@@ -202,7 +222,7 @@ def parse_script_to_scenes(script: str, topic: str) -> list[dict]:
         ],
     )
     raw = "[" + message.content[0].text
-    raw = raw.strip().rstrip("`").strip()
+    raw = _extract_json_array(raw)
     return json.loads(raw)
 
 
