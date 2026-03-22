@@ -738,6 +738,15 @@
                     } catch (_) {}
                 });
 
+                // Handle connection drop (worker timeout, server restart)
+                evtSource.onerror = () => {
+                    if (evtSource.readyState === EventSource.CLOSED) {
+                        addBuildLog('Connection lost — server may have restarted', 'log-line');
+                        buildBtn.disabled = false;
+                        buildBtn.textContent = 'Build Video';
+                    }
+                };
+
                 evtSource.addEventListener('end', () => {
                     evtSource.close();
                     buildBtn.disabled = false;
