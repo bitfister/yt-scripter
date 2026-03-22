@@ -449,6 +449,14 @@ def download_remotion():
                     fpath = os.path.join(img_dir, fname)
                     zf.write(fpath, os.path.join("public", "images", fname))
 
+        # Include public/audio/
+        audio_dir = os.path.join(remotion_dir, "public", "audio")
+        if os.path.isdir(audio_dir):
+            for fname in os.listdir(audio_dir):
+                if fname.endswith((".mp3", ".wav", ".ogg")):
+                    fpath = os.path.join(audio_dir, fname)
+                    zf.write(fpath, os.path.join("public", "audio", fname))
+
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="remotion-build.zip")
 
