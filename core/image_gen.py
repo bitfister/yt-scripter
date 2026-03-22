@@ -45,6 +45,14 @@ def generate_scene_images(
             scene["imagePath"] = None
             continue
 
+        # Skip if image already exists (avoid re-generating on retry)
+        filename = f"{scene_id}.png"
+        filepath = os.path.join(IMAGES_DIR, filename)
+        if os.path.exists(filepath):
+            _progress(f"Using existing image for {scene.get('title', scene_id)}")
+            scene["imagePath"] = f"images/{filename}"
+            continue
+
         _progress(f"Generating image ({i + 1}/{len(scenes)}): {scene.get('title', scene_id)}")
 
         try:

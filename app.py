@@ -236,8 +236,12 @@ def _video_worker(script: str, topic: str, q: queue.Queue):
         with open(os.path.join(data_dir, "script.json"), "w", encoding="utf-8") as f:
             json.dump(scene_data, f, indent=2)
 
-        # Step 3: Regenerate prompt with updated scene data (now includes imagePaths)
-        prompt = result["prompt"]
+        # Step 3: Regenerate prompt with updated scene data (now includes correct imagePaths)
+        from core.video_prompt import REMOTION_PROMPT_TEMPLATE
+        prompt = REMOTION_PROMPT_TEMPLATE.format(
+            topic=topic,
+            scenes_json=json.dumps(scene_data, indent=2),
+        )
 
         # Step 4: Generate Remotion components via Claude
         on_progress("Generating Remotion components...")
