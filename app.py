@@ -365,7 +365,26 @@ def _voiceover_worker(q: queue.Queue):
         on_progress(f"Generating voice-over for {len(scenes)} scenes...")
         generate_voiceover(scenes, progress_callback=on_progress)
 
-        # Update scene data with audioPath fields
+        # Recalculate scene durations to match actual audio length
+        audio_dir = os.path.join(_app_dir, "remotion", "public", "audio")
+        current_frame = 0
+        for scene in scenes:
+            ap = scene.get("audioPath")
+            if ap:
+                mp3_path = os.path.join(_app_dir, "remotion", "public", ap)
+                if os.path.exists(mp3_path):
+                    file_size = os.path.getsize(mp3_path)
+                    # OpenAI TTS outputs ~48kbps MP3; estimate duration from file size
+                    audio_seconds = file_size * 8 / 48000
+                    new_frames = int(audio_seconds * 30) + 30  # +1s buffer
+                    if new_frames > scene["durationFrames"]:
+                        scene["durationFrames"] = new_frames
+            scene["startFrame"] = current_frame
+            current_frame += scene["durationFrames"]
+        scene_data["totalDurationFrames"] = current_frame
+        on_progress(f"Adjusted scene durations to match audio ({current_frame // 30}s total)")
+
+        # Update scene data with audioPath fields and corrected durations
         with open(scene_path, "w", encoding="utf-8") as f:
             json.dump(scene_data, f, indent=2)
 
