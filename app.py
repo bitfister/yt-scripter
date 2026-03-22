@@ -178,7 +178,15 @@ def _video_worker(script: str, topic: str, q: queue.Queue):
         on_progress("Generating AI images for scenes...")
         generate_scene_images(scene_data["scenes"], topic, progress_callback=on_progress)
 
-        # Save scene data with correct imagePaths ONCE (after images are generated)
+        # Re-inject audioPath for any existing voice-over MP3s
+        audio_dir = os.path.join(_app_dir, "remotion", "public", "audio")
+        if os.path.isdir(audio_dir):
+            for scene in scene_data["scenes"]:
+                mp3 = os.path.join(audio_dir, scene["id"] + ".mp3")
+                if os.path.exists(mp3):
+                    scene["audioPath"] = f"audio/{scene['id']}.mp3"
+
+        # Save scene data with correct imagePaths and audioPaths
         data_dir = os.path.join(_app_dir, "remotion", "src", "data")
         os.makedirs(data_dir, exist_ok=True)
         with open(os.path.join(data_dir, "script.json"), "w", encoding="utf-8") as f:
