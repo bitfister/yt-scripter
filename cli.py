@@ -11,7 +11,7 @@ from core.summarize import summarize_video
 from core.compile import compile_script
 
 
-def run_pipeline(topic: str, max_videos: int = MAX_VIDEOS, time_range: str = "any") -> str:
+def run_pipeline(topic: str, max_videos: int = MAX_VIDEOS, time_range: str = "any") -> tuple[str, list[dict]]:
     """Run the full pipeline: search -> transcripts -> summarize -> compile."""
 
     # Step 1: Search

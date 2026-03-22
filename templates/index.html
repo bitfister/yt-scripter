@@ -717,8 +717,10 @@
             }
         }
 
+        let buildInProgress = false;
         async function buildVideo() {
-            if (!lastPrompt) return;
+            if (!lastScript || !lastTopic || buildInProgress) return;
+            buildInProgress = true;
             const buildBtn = document.getElementById('buildBtn');
             const progressEl = document.getElementById('buildProgress');
             buildBtn.disabled = true;
@@ -770,6 +772,7 @@
                         addBuildLog('Connection lost — server may have restarted', 'log-line');
                         buildBtn.disabled = false;
                         buildBtn.textContent = 'Build Video';
+                        buildInProgress = false;
                     }
                 };
 
@@ -777,11 +780,13 @@
                     evtSource.close();
                     buildBtn.disabled = false;
                     buildBtn.textContent = 'Build Video';
+                    buildInProgress = false;
                 });
             } catch (err) {
                 addBuildLog('Error: ' + err.message, 'log-line');
                 buildBtn.disabled = false;
                 buildBtn.textContent = 'Build Video';
+                buildInProgress = false;
             }
         }
 

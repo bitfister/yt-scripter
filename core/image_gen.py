@@ -36,14 +36,23 @@ def generate_scene_images(
         The scenes list with 'imagePath' added to each scene.
     """
     if not client:
+        msg = "⚠ OPENAI_API_KEY not set — images will not be generated (gradient-only backgrounds)"
         if progress_callback:
-            progress_callback("OPENAI_API_KEY not set — skipping image generation")
-        logger.warning("OPENAI_API_KEY not set, skipping DALL-E image generation")
+            progress_callback(msg)
+        logger.warning(msg)
         for scene in scenes:
             scene["imagePath"] = None
         return scenes
 
     os.makedirs(IMAGES_DIR, exist_ok=True)
+
+    # Clear old images that don't match current scene IDs to prevent collisions
+    current_ids = {s.get("id", f"scene-{i}") for i, s in enumerate(scenes)}
+    for existing in os.listdir(IMAGES_DIR):
+        if existing.endswith(".png"):
+            stem = existing[:-4]  # Remove .png
+            if stem not in current_ids:
+                os.remove(os.path.join(IMAGES_DIR, existing))
 
     def _progress(msg: str):
         if progress_callback:
