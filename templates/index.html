@@ -446,6 +446,7 @@
                 <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
                 <a class="copy-btn" id="downloadBtn" href="/download-remotion" style="display:none;text-decoration:none;text-align:center">Download ZIP</a>
                 <button class="video-btn" id="buildBtn" onclick="buildVideo()">Build Video</button>
+                <button class="copy-btn" id="voiceoverBtn" onclick="generateVoiceover()" style="display:none">🎙 Voice-Over</button>
             </div>
         </div>
     </div>
@@ -757,6 +758,7 @@
                     addBuildLog(`✓ Generated ${data.files.length} component files`, 'log-done');
                     addBuildLog('Click "Download ZIP" or run "git pull" to get files locally', 'log-done');
                     document.getElementById('downloadBtn').style.display = 'inline-block';
+                    document.getElementById('voiceoverBtn').style.display = 'inline-block';
                 });
 
                 evtSource.addEventListener('error', e => {
@@ -787,6 +789,69 @@
                 buildBtn.disabled = false;
                 buildBtn.textContent = 'Build Video';
                 buildInProgress = false;
+            }
+        }
+
+        async function generateVoiceover() {
+            const voBtn = document.getElementById('voiceoverBtn');
+            const progressEl = document.getElementById('buildProgress');
+            voBtn.disabled = true;
+            voBtn.textContent = '🎙 Generating...';
+            progressEl.style.display = 'block';
+
+            function addBuildLog(msg, cls) {
+                const div = document.createElement('div');
+                div.className = cls || 'log-line';
+                div.textContent = msg;
+                progressEl.appendChild(div);
+                progressEl.scrollTop = progressEl.scrollHeight;
+            }
+
+            try {
+                const res = await fetch('/generate-voiceover', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: '{}',
+                });
+                const { stream_id, error } = await res.json();
+                if (error) throw new Error(error);
+
+                const evtSource = new EventSource('/stream/' + stream_id);
+
+                evtSource.addEventListener('progress', e => {
+                    const data = JSON.parse(e.data);
+                    addBuildLog(data.message);
+                });
+
+                evtSource.addEventListener('done', e => {
+                    const data = JSON.parse(e.data);
+                    addBuildLog(`✓ Generated ${data.audio_count} audio files`, 'log-done');
+                    addBuildLog('Voice-over ready — rebuild video or download ZIP to preview', 'log-done');
+                });
+
+                evtSource.addEventListener('error', e => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        addBuildLog('Error: ' + data.message, 'log-line');
+                    } catch (_) {}
+                });
+
+                evtSource.onerror = () => {
+                    if (evtSource.readyState === EventSource.CLOSED) {
+                        voBtn.disabled = false;
+                        voBtn.textContent = '🎙 Voice-Over';
+                    }
+                };
+
+                evtSource.addEventListener('end', () => {
+                    evtSource.close();
+                    voBtn.disabled = false;
+                    voBtn.textContent = '🎙 Voice-Over';
+                });
+            } catch (err) {
+                addBuildLog('Error: ' + err.message, 'log-line');
+                voBtn.disabled = false;
+                voBtn.textContent = '🎙 Voice-Over';
             }
         }
 

@@ -180,6 +180,15 @@ If `scene.imagePath` is null, fall back to GradientBackground only.
    - Import ScriptVideo, set 1920x1080 at 30fps
    - Set durationInFrames from scriptData.totalDurationFrames
 
+## Voice-Over Audio
+If a scene has an `audioPath` field, add voice-over audio to that scene:
+```tsx
+import {{ Audio, staticFile }} from 'remotion';
+// Inside each scene's Sequence in ScriptVideo.tsx:
+{{scene.audioPath && <Audio src={{staticFile(scene.audioPath)}} />}}
+```
+Add this audio element inside each scene's `<Sequence>` in `ScriptVideo.tsx`, NOT in individual scene components.
+
 ## CRITICAL VISUAL RULES
 1. NEVER display narration text on screen. Narration is for voice-over ONLY.
 2. On-screen text: ONLY headlines (max 10 words), stat values, labels, and short titles.
@@ -187,8 +196,9 @@ If `scene.imagePath` is null, fall back to GradientBackground only.
 4. Use scene.mood and scene.colorAccent to configure GradientBackground and component colors.
 5. Ken Burns effect on background images: slow zoom (1.0 → 1.08) or slow pan using interpolate.
 6. Visual layering order: image bg → gradient overlay (0.5-0.7 opacity) → particles → main content → LowerThird.
+7. Import `Sequence`, `useCurrentFrame`, `interpolate`, `Img`, `staticFile`, `Audio` from `'remotion'`. Import library components from `'../components'` (in scene files) or `'./components'` (in ScriptVideo.tsx).
 
-Build all files now. Import components from '../components'."""
+Build all files now."""
 
 
 def _extract_json_array(text: str) -> str:

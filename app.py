@@ -31,6 +31,7 @@ from core.trending import get_trending
 from core.video_prompt import generate_remotion_prompt, REMOTION_PROMPT_TEMPLATE
 from core.video_gen import generate_video_components
 from core.image_gen import generate_scene_images
+from core.tts_gen import generate_voiceover
 from cli import save_script
 
 # --- Logging ---
@@ -329,6 +330,51 @@ def generate_video():
     thread = threading.Thread(target=_video_worker, args=(script, topic, q), daemon=True)
     thread.start()
 
+    return {"stream_id": qid}
+
+
+def _voiceover_worker(q: queue.Queue):
+    """Generate TTS audio for each scene in a background thread."""
+    try:
+        def on_progress(msg):
+            _send(q, "progress", {"step": 1, "message": msg})
+
+        # Load existing scene data
+        scene_path = os.path.join(_app_dir, "remotion", "src", "data", "script.json")
+        if not os.path.exists(scene_path):
+            _send(q, "error", {"message": "No scene data found. Run Build Video first."})
+            return
+
+        with open(scene_path, "r", encoding="utf-8") as f:
+            scene_data = json.load(f)
+
+        scenes = scene_data.get("scenes", [])
+        if not scenes:
+            _send(q, "error", {"message": "Scene data has no scenes."})
+            return
+
+        # Generate audio for each scene
+        on_progress(f"Generating voice-over for {len(scenes)} scenes...")
+        generate_voiceover(scenes, progress_callback=on_progress)
+
+        # Update scene data with audioPath fields
+        with open(scene_path, "w", encoding="utf-8") as f:
+            json.dump(scene_data, f, indent=2)
+
+        audio_count = sum(1 for s in scenes if s.get("audioPath"))
+        _send(q, "done", {"audio_count": audio_count})
+
+    except Exception as e:
+        _send(q, "error", {"message": str(e)})
+    finally:
+        _send(q, "end", {})
+
+
+@app.route("/generate-voiceover", methods=["POST"])
+def generate_voiceover_route():
+    qid, q = _new_queue()
+    thread = threading.Thread(target=_voiceover_worker, args=(q,), daemon=True)
+    thread.start()
     return {"stream_id": qid}
 
 
