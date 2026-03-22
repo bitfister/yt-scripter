@@ -317,6 +317,23 @@
             font-size: 0.8rem;
             margin-top: 8px;
         }
+        .build-progress {
+            margin-top: 12px;
+            background: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .build-progress .log-line { color: #aaa; }
+        .build-progress .log-line:last-child { color: #ff8800; }
+        .build-progress .log-done { color: #4caf50; font-weight: bold; }
 
         .error-msg {
             background: #3a1111;
@@ -424,8 +441,10 @@
                 <div class="prompt-output" id="remotionPrompt"></div>
                 <div class="modal-info" id="modalInfo"></div>
             </div>
+            <div class="build-progress" id="buildProgress"></div>
             <div class="modal-footer">
                 <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
+                <button class="video-btn" id="buildBtn" onclick="buildVideo()">Build Video</button>
             </div>
         </div>
     </div>
@@ -637,6 +656,7 @@
         // --- Video prompt generation ---
         let lastScript = '';
         let lastTopic = '';
+        let lastPrompt = '';
 
         async function createVideo() {
             const videoBtn = document.getElementById('videoBtn');
@@ -655,15 +675,78 @@
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
 
+                lastPrompt = data.prompt;
                 document.getElementById('remotionPrompt').textContent = data.prompt;
                 document.getElementById('modalInfo').textContent =
                     `Scene data saved to: ${data.saved_to} • ${data.scenes.scenes.length} scenes • ${Math.round(data.scenes.totalDurationFrames / 30)}s total`;
+                document.getElementById('buildProgress').style.display = 'none';
+                document.getElementById('buildProgress').innerHTML = '';
+                document.getElementById('buildBtn').disabled = false;
+                document.getElementById('buildBtn').textContent = 'Build Video';
                 document.getElementById('videoModal').classList.add('active');
             } catch (err) {
                 showError('Video prompt failed: ' + err.message);
             } finally {
                 videoBtn.disabled = false;
                 videoBtn.textContent = 'Create Video';
+            }
+        }
+
+        async function buildVideo() {
+            if (!lastPrompt) return;
+            const buildBtn = document.getElementById('buildBtn');
+            const progressEl = document.getElementById('buildProgress');
+            buildBtn.disabled = true;
+            buildBtn.textContent = 'Building...';
+            progressEl.style.display = 'block';
+            progressEl.innerHTML = '';
+
+            function addBuildLog(msg, cls) {
+                const div = document.createElement('div');
+                div.className = cls || 'log-line';
+                div.textContent = msg;
+                progressEl.appendChild(div);
+                progressEl.scrollTop = progressEl.scrollHeight;
+            }
+
+            try {
+                const res = await fetch('/generate-video', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ prompt: lastPrompt }),
+                });
+                const { stream_id, error } = await res.json();
+                if (error) throw new Error(error);
+
+                const evtSource = new EventSource('/stream/' + stream_id);
+
+                evtSource.addEventListener('progress', e => {
+                    const data = JSON.parse(e.data);
+                    addBuildLog(data.message);
+                });
+
+                evtSource.addEventListener('done', e => {
+                    const data = JSON.parse(e.data);
+                    addBuildLog(`✓ Generated ${data.files.length} component files`, 'log-done');
+                    addBuildLog('Run "npx remotion studio" in remotion/ to preview', 'log-done');
+                });
+
+                evtSource.addEventListener('error', e => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        addBuildLog('Error: ' + data.message, 'log-line');
+                    } catch (_) {}
+                });
+
+                evtSource.addEventListener('end', () => {
+                    evtSource.close();
+                    buildBtn.disabled = false;
+                    buildBtn.textContent = 'Build Video';
+                });
+            } catch (err) {
+                addBuildLog('Error: ' + err.message, 'log-line');
+                buildBtn.disabled = false;
+                buildBtn.textContent = 'Build Video';
             }
         }
 

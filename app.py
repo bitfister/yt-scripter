@@ -24,6 +24,7 @@ from core.summarize import summarize_video
 from core.compile import compile_script
 from core.trending import get_trending
 from core.video_prompt import generate_remotion_prompt
+from core.video_gen import generate_video_components
 from cli import save_script
 
 app = Flask(__name__, template_folder=os.path.join(_app_dir, "templates"))
@@ -162,6 +163,35 @@ def video_prompt():
         }
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+def _video_worker(prompt: str, q: queue.Queue):
+    """Run Remotion component generation in a background thread."""
+    try:
+        def on_progress(msg):
+            _send(q, "progress", {"step": 1, "message": msg})
+
+        files = generate_video_components(prompt, progress_callback=on_progress)
+        _send(q, "done", {"files": files})
+    except Exception as e:
+        _send(q, "error", {"message": str(e)})
+    finally:
+        _send(q, "end", {})
+
+
+@app.route("/generate-video", methods=["POST"])
+def generate_video():
+    data = request.json
+    prompt = data.get("prompt", "").strip()
+
+    if not prompt:
+        return {"error": "Prompt is required"}, 400
+
+    qid, q = _new_queue()
+    thread = threading.Thread(target=_video_worker, args=(prompt, q), daemon=True)
+    thread.start()
+
+    return {"stream_id": qid}
 
 
 @app.route("/generate", methods=["POST"])
