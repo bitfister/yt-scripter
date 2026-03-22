@@ -158,7 +158,12 @@ def stream(stream_id: int):
 
     def event_stream():
         while True:
-            msg = q.get()
+            try:
+                msg = q.get(timeout=15)
+            except queue.Empty:
+                # Send SSE keepalive comment to prevent connection timeout
+                yield ": keepalive\n\n"
+                continue
             yield msg
             if '"end"' in msg or "event: end" in msg:
                 break

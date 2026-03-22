@@ -585,7 +585,13 @@
                         const data = JSON.parse(e.data);
                         showError(data.message);
                     } catch {
-                        showError('Connection lost.');
+                        // Native EventSource error (connection drop) — not a server-sent error event
+                        if (evtSource.readyState === EventSource.CLOSED) {
+                            showError('Connection lost. The server may have stopped.');
+                            btn.disabled = false;
+                            btn.textContent = 'Generate';
+                        }
+                        // If CONNECTING, EventSource is auto-reconnecting — let it retry
                     }
                 });
 
