@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Scripter — Login</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f0f;
+            color: #e8e8e8;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-box {
+            width: 100%;
+            max-width: 380px;
+            padding: 40px 32px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #ff4444, #ff8800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #888; margin-bottom: 28px; font-size: 0.9rem; }
+        label { display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 6px; }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 1rem;
+            background: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            outline: none;
+            margin-bottom: 18px;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: #ff4444; }
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        .error {
+            background: rgba(255, 0, 0, 0.15);
+            border: 1px solid #ff4444;
+            color: #ff6666;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>YT Scripter</h1>
+        <p class="subtitle">Sign in to continue</p>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <button type="submit">Sign In</button>
+        </form>
+    </div>
+</body>
+</html>

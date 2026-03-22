@@ -10,9 +10,14 @@ import threading
 _app_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _app_dir)
 
-from flask import Flask, render_template, request, Response
+from flask import Flask, render_template, request, Response, session, redirect, url_for
+from werkzeug.security import check_password_hash
 
 from config import MAX_VIDEOS
+
+# Auth credentials (password stored as hash only)
+AUTH_USER = "admin"
+AUTH_HASH = "scrypt:32768:8:1$RN0j9QwVo2k2J2Xg$1d58a4b973d124d7f26a35624d6e1c47179f4f1e1eabf4f057d73a3488e8ecee2e81b87081a7b926d4dc3b81ffc79372ee31527e7457e3b097c6e1a83a04f6b6"
 from core.search import search_videos
 from core.transcript import fetch_all_transcripts
 from core.summarize import summarize_video
@@ -22,6 +27,7 @@ from core.video_prompt import generate_remotion_prompt
 from cli import save_script
 
 app = Flask(__name__, template_folder=os.path.join(_app_dir, "templates"))
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32))
 
 # Per-request progress queues, keyed by a simple incrementing ID
 _progress_queues: dict[int, queue.Queue] = {}
@@ -87,6 +93,31 @@ def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queu
         _send(q, "error", {"message": str(e)})
     finally:
         _send(q, "end", {})
+
+
+@app.before_request
+def require_login():
+    if request.endpoint not in ("login", "static") and not session.get("logged_in"):
+        return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        if username == AUTH_USER and check_password_hash(AUTH_HASH, password):
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/")
