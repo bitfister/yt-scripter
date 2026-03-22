@@ -1,7 +1,7 @@
 #!/bin/bash
 # YT Scripter — Lightsail bootstrap script
 # This runs automatically on first boot via --user-data
-set -euo pipefail
+set -eu
 
 REPO="https://github.com/bitfister/yt-scripter.git"
 APP_DIR="/home/ubuntu/yt-scripter"

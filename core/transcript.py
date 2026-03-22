@@ -1,13 +1,38 @@
 """Fetch YouTube video transcripts (auto-generated or manual captions)."""
 
+import os
 import time
 from youtube_transcript_api import YouTubeTranscriptApi
 from config import MAX_TRANSCRIPT_CHARS
 
-_api = YouTubeTranscriptApi()
-
 # Delay between transcript requests to avoid YouTube IP rate-limiting
 REQUEST_DELAY = 2.0  # seconds
+
+
+def _build_api() -> YouTubeTranscriptApi:
+    """Build API client with Webshare proxy if credentials are set."""
+    proxy_user = os.getenv("WEBSHARE_PROXY_USER")
+    proxy_pass = os.getenv("WEBSHARE_PROXY_PASS")
+
+    if proxy_user and proxy_pass:
+        from youtube_transcript_api.proxies import WebshareProxyConfig
+        return YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=proxy_user,
+                proxy_password=proxy_pass,
+            )
+        )
+
+    return YouTubeTranscriptApi()
+
+
+# Single client instance — WebshareProxyConfig handles rotation + retry internally
+_api = _build_api()
+
+if os.getenv("WEBSHARE_PROXY_USER"):
+    print("  [proxy] Using Webshare residential proxy (auto-rotating)")
+else:
+    print("  [proxy] No proxy configured — using direct connection")
 
 
 def get_transcript(video_id: str) -> str | None:

@@ -1,5 +1,6 @@
 # Environment
 .env
+proxies.txt
 
 # Python
 __pycache__/
@@ -22,3 +23,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+Readme.txt
+*.csv
