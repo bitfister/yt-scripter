@@ -728,7 +728,7 @@
                 evtSource.addEventListener('done', e => {
                     const data = JSON.parse(e.data);
                     addBuildLog(`✓ Generated ${data.files.length} component files`, 'log-done');
-                    addBuildLog('Run "npx remotion studio" in remotion/ to preview', 'log-done');
+                    addBuildLog('Run "git pull && npx remotion studio" in remotion/ to preview', 'log-done');
                 });
 
                 evtSource.addEventListener('error', e => {

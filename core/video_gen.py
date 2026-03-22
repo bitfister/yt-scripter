@@ -2,6 +2,7 @@
 
 import os
 import re
+import subprocess
 
 import anthropic
 
@@ -136,4 +137,41 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
             break
 
     _progress(f"Done — wrote {len(files_written)} files")
+
+    # Auto-sync: commit and push generated files to git
+    _sync_to_git(files_written, _progress)
+
     return files_written
+
+
+def _sync_to_git(files: list[str], progress_callback=None):
+    """Commit and push generated Remotion files so they can be pulled locally."""
+    if not files:
+        return
+
+    def _progress(msg: str):
+        if progress_callback:
+            progress_callback(msg)
+
+    try:
+        # Stage all generated files (paths are relative to remotion/src/)
+        git_paths = [os.path.join("remotion", "src", f) for f in files]
+        subprocess.run(
+            ["git", "add"] + git_paths,
+            cwd=_app_dir, check=True, capture_output=True, text=True,
+        )
+
+        # Commit
+        subprocess.run(
+            ["git", "commit", "-m", "Auto-generated Remotion video components"],
+            cwd=_app_dir, check=True, capture_output=True, text=True,
+        )
+
+        # Push
+        subprocess.run(
+            ["git", "push"],
+            cwd=_app_dir, check=True, capture_output=True, text=True,
+        )
+        _progress("Synced to git — run `git pull` locally")
+    except subprocess.CalledProcessError as e:
+        _progress(f"Git sync failed: {e.stderr.strip() or e.stdout.strip()}")
