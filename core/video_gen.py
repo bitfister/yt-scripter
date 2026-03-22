@@ -88,13 +88,15 @@ def generate_video_components(prompt: str, progress_callback=None) -> list[str]:
     _progress("Sending prompt to Claude...")
 
     while True:
-        response = client.messages.create(
+        # Use streaming to avoid Anthropic's 10-minute timeout on long requests
+        with client.messages.stream(
             model=CLAUDE_MODEL,
             max_tokens=32000,
             system=SYSTEM_PROMPT,
             tools=[WRITE_FILE_TOOL],
             messages=messages,
-        )
+        ) as stream:
+            response = stream.get_final_message()
 
         # Process response content blocks
         assistant_content = response.content
