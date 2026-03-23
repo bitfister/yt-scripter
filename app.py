@@ -23,7 +23,7 @@ from werkzeug.security import check_password_hash
 
 from config import MAX_VIDEOS, MAX_TOPIC_LENGTH
 
-from core.search import search_videos
+from core.search import search_videos, mark_videos_used
 from core.transcript import fetch_all_transcripts
 from core.summarize import summarize_video
 from core.compile import compile_script
@@ -132,6 +132,9 @@ def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queu
         if not videos_with_transcripts:
             _send(q, "error", {"message": "No transcripts available for any videos."})
             return
+
+        # Mark these videos as used so they won't appear in future searches
+        mark_videos_used(videos_with_transcripts)
 
         # Step 3: Summarize
         for i, video in enumerate(videos_with_transcripts, 1):

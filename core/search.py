@@ -1,8 +1,13 @@
 """YouTube video search by topic, sorted by view count with optional time filter."""
 
 import base64
+import json
+import os
 
 from scrapetube.scrapetube import get_videos
+
+_app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+USED_VIDEOS_PATH = os.path.join(_app_dir, "used_videos.json")
 
 # YouTube protobuf-encoded sort values
 _SORT_MAP = {"relevance": 1, "upload_date": 2, "view_count": 3, "rating": 4}
@@ -46,7 +51,12 @@ def search_videos(
     url = f"https://www.youtube.com/results?search_query={topic}&sp={sp}"
     api_endpoint = "https://www.youtube.com/youtubei/v1/search"
 
-    raw = list(get_videos(url, api_endpoint, "contents", "videoRenderer", max_results, 1))
+    # Fetch more than needed so we can filter out previously used videos
+    fetch_count = max_results * 3
+    raw = list(get_videos(url, api_endpoint, "contents", "videoRenderer", fetch_count, 1))
+
+    # Load previously used video IDs
+    used_ids = _load_used_ids()
 
     videos = []
     for item in raw:
@@ -58,6 +68,10 @@ def search_videos(
         views = item.get("viewCountText", {}).get("simpleText", "N/A")
         duration = item.get("lengthText", {}).get("simpleText", "N/A")
 
+        # Skip previously used videos
+        if video_id in used_ids:
+            continue
+
         videos.append({
             "title": title,
             "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -67,4 +81,34 @@ def search_videos(
             "channel": channel,
         })
 
+        if len(videos) >= max_results:
+            break
+
     return videos
+
+
+def mark_videos_used(videos: list[dict]):
+    """Record video IDs as used so they won't appear in future searches."""
+    used_ids = _load_used_ids()
+    for v in videos:
+        vid = v.get("video_id", "")
+        if vid:
+            used_ids.add(vid)
+    _save_used_ids(used_ids)
+
+
+def _load_used_ids() -> set:
+    """Load the set of previously used video IDs from disk."""
+    if os.path.exists(USED_VIDEOS_PATH):
+        try:
+            with open(USED_VIDEOS_PATH, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except (json.JSONDecodeError, TypeError):
+            return set()
+    return set()
+
+
+def _save_used_ids(ids: set):
+    """Persist the used video IDs to disk."""
+    with open(USED_VIDEOS_PATH, "w", encoding="utf-8") as f:
+        json.dump(sorted(ids), f, indent=2)
