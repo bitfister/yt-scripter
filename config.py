@@ -10,12 +10,15 @@ logger = logging.getLogger("yt-scripter")
 # --- API Keys ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 
 # Validate required keys at import time
 if not ANTHROPIC_API_KEY:
     logger.warning("ANTHROPIC_API_KEY not set — Claude API calls will fail")
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY not set — DALL-E image generation will be skipped")
+if not PEXELS_API_KEY:
+    logger.warning("PEXELS_API_KEY not set — Pexels stock media will be skipped")
 
 # --- Models ---
 CLAUDE_MODEL = "claude-sonnet-4-20250514"

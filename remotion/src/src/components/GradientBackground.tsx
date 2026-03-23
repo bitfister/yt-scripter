@@ -7,7 +7,6 @@ interface GradientBackgroundProps {
   mood?: Mood;
   colorAccent?: string;
   animationIntensity?: 'low' | 'medium' | 'high';
-  style?: React.CSSProperties;
 }
 
 const MOOD_PALETTES: Record<Mood, { colors: string[]; angle: number }> = {
@@ -25,7 +24,6 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({
   mood = 'dark',
   colorAccent = '#ff4400',
   animationIntensity = 'medium',
-  style: containerStyle,
 }) => {
   const frame = useCurrentFrame();
   const speed = INTENSITY_SPEED[animationIntensity];
@@ -49,7 +47,7 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({
   const vignetteOpacity = mood === 'warning' || mood === 'tense' ? 0.6 : 0.4;
 
   return (
-    <AbsoluteFill style={containerStyle}>
+    <AbsoluteFill>
       {/* Base gradient */}
       <AbsoluteFill
         style={{

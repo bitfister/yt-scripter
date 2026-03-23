@@ -32,6 +32,7 @@ from core.video_prompt import generate_remotion_prompt, REMOTION_PROMPT_TEMPLATE
 from core.video_gen import generate_video_components
 from core.image_gen import generate_scene_images
 from core.tts_gen import generate_voiceover
+from core.stock_media import fetch_stock_media
 from cli import save_script
 
 # --- Logging ---
@@ -177,6 +178,12 @@ def _video_worker(script: str, topic: str, q: queue.Queue):
         # Step 2: Generate DALL-E images for each scene
         on_progress("Generating AI images for scenes...")
         generate_scene_images(scene_data["scenes"], topic, progress_callback=on_progress)
+
+        # Step 2b: Fetch stock photos/videos from Pexels
+        on_progress("Searching Pexels for stock media...")
+        fetch_stock_media(scene_data["scenes"], progress_callback=on_progress)
+        stock_count = sum(1 for s in scene_data["scenes"] if s.get("stockMedia"))
+        on_progress(f"Stock media ready for {stock_count}/{len(scene_data['scenes'])} scenes")
 
         # Re-inject audioPath for any existing voice-over MP3s
         audio_dir = os.path.join(_app_dir, "remotion", "public", "audio")
@@ -365,24 +372,39 @@ def _voiceover_worker(q: queue.Queue):
         on_progress(f"Generating voice-over for {len(scenes)} scenes...")
         generate_voiceover(scenes, progress_callback=on_progress)
 
-        # Recalculate scene durations to match actual audio length
-        audio_dir = os.path.join(_app_dir, "remotion", "public", "audio")
+        # Recalculate scene durations to match actual audio length using mutagen
+        from mutagen.mp3 import MP3
+
+        on_progress("Syncing visual timing to audio durations...")
         current_frame = 0
         for scene in scenes:
             ap = scene.get("audioPath")
             if ap:
                 mp3_path = os.path.join(_app_dir, "remotion", "public", ap)
                 if os.path.exists(mp3_path):
-                    file_size = os.path.getsize(mp3_path)
-                    # OpenAI TTS outputs ~48kbps MP3; estimate duration from file size
-                    audio_seconds = file_size * 8 / 48000
-                    new_frames = int(audio_seconds * 30) + 30  # +1s buffer
-                    if new_frames > scene["durationFrames"]:
-                        scene["durationFrames"] = new_frames
+                    try:
+                        audio = MP3(mp3_path)
+                        audio_seconds = audio.info.length
+                        scene["audioDurationSeconds"] = round(audio_seconds, 2)
+                        new_frames = int(audio_seconds * 30) + 15  # +0.5s buffer
+                        old_frames = scene["durationFrames"]
+
+                        if new_frames != old_frames:
+                            scene["durationFrames"] = new_frames
+                            # Proportionally rescale segment timings
+                            if scene.get("segments") and old_frames > 0:
+                                ratio = new_frames / old_frames
+                                running = 0
+                                for seg in scene["segments"]:
+                                    seg["startOffset"] = int(running)
+                                    seg["durationFrames"] = max(60, int(seg["durationFrames"] * ratio))
+                                    running += seg["durationFrames"]
+                    except Exception as e:
+                        on_progress(f"Warning: could not read {ap}: {e}")
             scene["startFrame"] = current_frame
             current_frame += scene["durationFrames"]
         scene_data["totalDurationFrames"] = current_frame
-        on_progress(f"Adjusted scene durations to match audio ({current_frame // 30}s total)")
+        on_progress(f"Synced — total video duration: {current_frame // 30}s ({current_frame} frames)")
 
         # Update scene data with audioPath fields and corrected durations
         with open(scene_path, "w", encoding="utf-8") as f:
@@ -483,6 +505,16 @@ def download_remotion():
                 if fname.endswith((".mp3", ".wav", ".ogg")):
                     fpath = os.path.join(audio_dir, fname)
                     zf.write(fpath, os.path.join("public", "audio", fname))
+
+        # Include public/stock/ (Pexels photos and videos)
+        stock_dir = os.path.join(remotion_dir, "public", "stock")
+        if os.path.isdir(stock_dir):
+            for root, _, files in os.walk(stock_dir):
+                for fname in files:
+                    if fname.endswith((".jpg", ".png", ".mp4")):
+                        fpath = os.path.join(root, fname)
+                        arcname = os.path.relpath(fpath, remotion_dir)
+                        zf.write(fpath, arcname)
 
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="remotion-build.zip")

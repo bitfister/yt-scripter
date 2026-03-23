@@ -1,13 +1,13 @@
 {
   "topic": "AI Warning Scary",
-  "totalDurationFrames": 16770,
+  "totalDurationFrames": 28452,
   "fps": 30,
   "scenes": [
     {
       "id": "hook",
       "type": "hook",
       "title": "The Godfather's Warning",
-      "durationFrames": 450,
+      "durationFrames": 750,
       "transition": "cut",
       "mood": "tense",
       "colorAccent": "#ff4400",
@@ -28,13 +28,14 @@
           "severity": "critical"
         }
       ],
-      "startFrame": 0
+      "startFrame": 0,
+      "audioPath": "audio/hook.mp3"
     },
     {
       "id": "intro",
       "type": "intro",
       "title": "The Unprecedented Moment",
-      "durationFrames": 1350,
+      "durationFrames": 2177,
       "transition": "fade",
       "mood": "dark",
       "colorAccent": "#cc2200",
@@ -86,13 +87,14 @@
           ]
         }
       ],
-      "startFrame": 450
+      "startFrame": 750,
+      "audioPath": "audio/intro.mp3"
     },
     {
       "id": "section-the-godfathers-reckoning",
       "type": "section",
       "title": "The Godfather's Reckoning",
-      "durationFrames": 2430,
+      "durationFrames": 3761,
       "transition": "fade",
       "mood": "tense",
       "colorAccent": "#ff6600",
@@ -155,7 +157,8 @@
           "emphasis": "danger"
         }
       ],
-      "startFrame": 1800
+      "startFrame": 2927,
+      "audioPath": "audio/section-the-godfathers-reckoning.mp3"
     },
     {
       "id": "section-threats-happening-now",
@@ -214,13 +217,13 @@
           ]
         }
       ],
-      "startFrame": 4230
+      "startFrame": 6688
     },
     {
       "id": "section-self-preservation-nightmare",
       "type": "section",
       "title": "The Self-Preservation Nightmare",
-      "durationFrames": 2250,
+      "durationFrames": 4544,
       "transition": "fade",
       "mood": "dark",
       "colorAccent": "#990022",
@@ -287,13 +290,14 @@
           ]
         }
       ],
-      "startFrame": 5880
+      "startFrame": 8338,
+      "audioPath": "audio/section-self-preservation-nightmare.mp3"
     },
     {
       "id": "section-geopolitical-time-bomb",
       "type": "section",
       "title": "The Geopolitical Time Bomb",
-      "durationFrames": 2010,
+      "durationFrames": 4519,
       "transition": "cut",
       "mood": "tense",
       "colorAccent": "#ff4400",
@@ -359,13 +363,14 @@
           "attribution": "The safety problem"
         }
       ],
-      "startFrame": 8130
+      "startFrame": 12882,
+      "audioPath": "audio/section-geopolitical-time-bomb.mp3"
     },
     {
       "id": "section-nothing-can-stop-this",
       "type": "section",
       "title": "Why Nothing Can Stop This",
-      "durationFrames": 1890,
+      "durationFrames": 3650,
       "transition": "fade",
       "mood": "warning",
       "colorAccent": "#cc4400",
@@ -418,13 +423,14 @@
           "severity": "critical"
         }
       ],
-      "startFrame": 10140
+      "startFrame": 17401,
+      "audioPath": "audio/section-nothing-can-stop-this.mp3"
     },
     {
       "id": "section-alignment-trap",
       "type": "section",
       "title": "The Alignment Trap We're Already In",
-      "durationFrames": 1650,
+      "durationFrames": 3022,
       "transition": "fade",
       "mood": "dark",
       "colorAccent": "#992244",
@@ -469,13 +475,14 @@
           ]
         }
       ],
-      "startFrame": 12030
+      "startFrame": 21051,
+      "audioPath": "audio/section-alignment-trap.mp3"
     },
     {
       "id": "section-narrow-window",
       "type": "section",
       "title": "The Narrow Window",
-      "durationFrames": 1290,
+      "durationFrames": 2426,
       "transition": "cut",
       "mood": "warning",
       "colorAccent": "#ff6622",
@@ -528,13 +535,14 @@
           "severity": "critical"
         }
       ],
-      "startFrame": 13680
+      "startFrame": 24073,
+      "audioPath": "audio/section-narrow-window.mp3"
     },
     {
       "id": "outro",
       "type": "outro",
       "title": "What We've Established",
-      "durationFrames": 1800,
+      "durationFrames": 1953,
       "transition": "fade",
       "mood": "tense",
       "colorAccent": "#cc3300",
@@ -583,7 +591,8 @@
           "attribution": "Why Hinton left Google"
         }
       ],
-      "startFrame": 14970
+      "startFrame": 26499,
+      "audioPath": "audio/outro.mp3"
     }
   ]
 }
