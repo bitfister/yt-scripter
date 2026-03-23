@@ -35,3 +35,4 @@ API_RETRY_BASE_DELAY = 2  # seconds, exponential backoff
 
 # --- Paths ---
 OUTPUT_DIR = os.path.join(_config_dir, "output")
+TRANSCRIPTS_DIR = os.path.join(_config_dir, "transcripts")

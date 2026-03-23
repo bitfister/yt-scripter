@@ -24,7 +24,7 @@ from werkzeug.security import check_password_hash
 from config import MAX_VIDEOS, MAX_TOPIC_LENGTH
 
 from core.search import search_videos, mark_videos_used
-from core.transcript import fetch_all_transcripts
+from core.transcript import fetch_all_transcripts, load_transcript, list_cached_transcripts
 from core.summarize import summarize_video
 from core.compile import compile_script
 from core.trending import get_trending
@@ -108,33 +108,66 @@ def _send(q: queue.Queue, event: str, data: dict):
 
 
 # --- Pipeline worker ---
-def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queue):
+def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queue,
+                     selected_transcript_ids: list[str] | None = None):
     """Run the pipeline in a background thread, pushing SSE events."""
     try:
-        # Step 1: Search
-        time_label = f" (past {time_range})" if time_range != "any" else ""
-        _send(q, "progress", {"step": 1, "message": f'Searching YouTube for "{topic}"{time_label}...'})
-        videos = search_videos(topic, max_results=max_videos, time_range=time_range)
-        _send(q, "progress", {"step": 1, "message": f"Found {len(videos)} videos"})
+        # Load locally-selected transcripts first
+        local_videos = []
+        if selected_transcript_ids:
+            for vid_id in selected_transcript_ids:
+                cached = load_transcript(vid_id)
+                if cached:
+                    local_videos.append(cached)
+            if local_videos:
+                _send(q, "progress", {
+                    "step": 1,
+                    "message": f"Loaded {len(local_videos)} saved transcript(s)",
+                })
 
-        if not videos:
-            _send(q, "error", {"message": "No videos found for this topic."})
-            return
+        # Calculate how many more we need from YouTube
+        remaining = max(0, max_videos - len(local_videos))
 
-        # Step 2: Transcripts
-        _send(q, "progress", {"step": 2, "message": "Fetching transcripts..."})
-        videos_with_transcripts = fetch_all_transcripts(videos)
-        _send(q, "progress", {
-            "step": 2,
-            "message": f"Got transcripts for {len(videos_with_transcripts)}/{len(videos)} videos",
-        })
+        # Step 1: Search YouTube for remaining videos
+        new_videos_with_transcripts = []
+        if remaining > 0:
+            time_label = f" (past {time_range})" if time_range != "any" else ""
+            _send(q, "progress", {"step": 1, "message": f'Searching YouTube for "{topic}"{time_label}...'})
+            videos = search_videos(topic, max_results=remaining, time_range=time_range)
+            _send(q, "progress", {"step": 1, "message": f"Found {len(videos)} videos"})
+
+            if not videos and not local_videos:
+                _send(q, "error", {"message": "No videos found for this topic."})
+                return
+
+            # Step 2: Transcripts for new videos
+            if videos:
+                _send(q, "progress", {"step": 2, "message": "Fetching transcripts..."})
+                new_videos_with_transcripts = fetch_all_transcripts(videos)
+                _send(q, "progress", {
+                    "step": 2,
+                    "message": f"Got transcripts for {len(new_videos_with_transcripts)}/{len(videos)} videos",
+                })
+
+                # Mark new videos as used
+                mark_videos_used(new_videos_with_transcripts)
+        else:
+            _send(q, "progress", {"step": 1, "message": "Using saved transcripts only — no YouTube search needed"})
+
+        # Merge local + new
+        videos_with_transcripts = local_videos + new_videos_with_transcripts
 
         if not videos_with_transcripts:
-            _send(q, "error", {"message": "No transcripts available for any videos."})
+            _send(q, "error", {"message": "No transcripts available from any source."})
             return
 
-        # Mark these videos as used so they won't appear in future searches
-        mark_videos_used(videos_with_transcripts)
+        total = len(videos_with_transcripts)
+        local_count = len(local_videos)
+        new_count = len(new_videos_with_transcripts)
+        _send(q, "progress", {
+            "step": 2,
+            "message": f"Total sources: {total} ({local_count} saved + {new_count} new)",
+        })
 
         # Step 3: Summarize
         for i, video in enumerate(videos_with_transcripts, 1):
@@ -445,13 +478,24 @@ def generate():
         return {"error": f"Topic too long (max {MAX_TOPIC_LENGTH} chars)"}, 400
     max_videos = max(1, min(max_videos, 20))
 
+    selected_ids = data.get("selected_transcript_ids", [])
+
     qid, q = _new_queue()
     thread = threading.Thread(
-        target=_pipeline_worker, args=(topic, max_videos, time_range, q), daemon=True,
+        target=_pipeline_worker,
+        args=(topic, max_videos, time_range, q),
+        kwargs={"selected_transcript_ids": selected_ids},
+        daemon=True,
     )
     thread.start()
 
     return {"stream_id": qid}
+
+
+@app.route("/transcripts")
+def list_transcripts():
+    """List all cached transcripts (metadata only)."""
+    return {"transcripts": list_cached_transcripts()}
 
 
 @app.route("/stream/<int:stream_id>")

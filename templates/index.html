@@ -335,6 +335,69 @@
         .build-progress .log-line:last-child { color: #ff8800; }
         .build-progress .log-done { color: #4caf50; font-weight: bold; }
 
+        .transcript-toggle {
+            background: none;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #888;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .transcript-toggle:hover { color: #ff8800; border-color: #ff8800; }
+        .transcript-toggle.active { color: #ff8800; border-color: #ff8800; }
+        .transcript-panel {
+            display: none;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .transcript-panel.open { display: block; }
+        .transcript-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .transcript-item:hover { background: #252525; }
+        .transcript-item input { accent-color: #ff8800; cursor: pointer; }
+        .transcript-item label { cursor: pointer; flex: 1; }
+        .transcript-item .t-title { color: #ddd; font-size: 0.85rem; }
+        .transcript-item .t-meta { color: #666; font-size: 0.75rem; }
+        .selected-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .selected-chip {
+            background: #2a1800;
+            border: 1px solid #ff8800;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            color: #ff8800;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .selected-chip .chip-remove {
+            cursor: pointer;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        .selected-chip .chip-remove:hover { opacity: 1; }
+        .transcript-empty { color: #555; text-align: center; padding: 20px; font-size: 0.85rem; }
+
         .error-msg {
             background: #3a1111;
             border: 1px solid #ff4444;
@@ -364,6 +427,10 @@
             <input type="number" id="maxVideos" value="{{ max_videos }}" min="1" max="20" title="Max videos">
             <button id="generateBtn" onclick="generate()">Generate</button>
         </div>
+
+        <div class="selected-chips" id="selectedChips"></div>
+        <button class="transcript-toggle" id="transcriptToggle" onclick="toggleTranscripts()">📂 Saved Transcripts</button>
+        <div class="transcript-panel" id="transcriptPanel"></div>
 
         <div class="trending-section">
             <div class="trending-header">
@@ -559,6 +626,87 @@
             } catch (_) {}
         })();
 
+        // --- Saved Transcripts ---
+        let selectedTranscriptIds = [];
+        let transcriptCache = null;
+
+        async function toggleTranscripts() {
+            const panel = document.getElementById('transcriptPanel');
+            const toggle = document.getElementById('transcriptToggle');
+            const isOpen = panel.classList.contains('open');
+
+            if (isOpen) {
+                panel.classList.remove('open');
+                toggle.classList.remove('active');
+                return;
+            }
+
+            toggle.classList.add('active');
+            panel.classList.add('open');
+
+            // Load transcripts if not cached
+            if (!transcriptCache) {
+                panel.innerHTML = '<div class="transcript-empty">Loading...</div>';
+                try {
+                    const res = await fetch('/transcripts');
+                    const data = await res.json();
+                    transcriptCache = data.transcripts || [];
+                } catch (e) {
+                    panel.innerHTML = '<div class="transcript-empty">Failed to load transcripts</div>';
+                    return;
+                }
+            }
+
+            renderTranscriptList();
+        }
+
+        function renderTranscriptList() {
+            const panel = document.getElementById('transcriptPanel');
+            if (!transcriptCache || transcriptCache.length === 0) {
+                panel.innerHTML = '<div class="transcript-empty">No saved transcripts yet. Generate a script first — transcripts are auto-saved.</div>';
+                return;
+            }
+
+            panel.innerHTML = transcriptCache.map(t => {
+                const checked = selectedTranscriptIds.includes(t.video_id) ? 'checked' : '';
+                const date = t.fetched_at ? new Date(t.fetched_at).toLocaleDateString() : '';
+                return `<div class="transcript-item" onclick="toggleTranscriptSelect('${t.video_id}')">
+                    <input type="checkbox" ${checked} onclick="event.stopPropagation()">
+                    <label>
+                        <div class="t-title">${t.title}</div>
+                        <div class="t-meta">${t.channel} · ${t.views} · ${date}</div>
+                    </label>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleTranscriptSelect(videoId) {
+            const idx = selectedTranscriptIds.indexOf(videoId);
+            if (idx >= 0) {
+                selectedTranscriptIds.splice(idx, 1);
+            } else {
+                selectedTranscriptIds.push(videoId);
+            }
+            renderTranscriptList();
+            renderSelectedChips();
+        }
+
+        function renderSelectedChips() {
+            const container = document.getElementById('selectedChips');
+            if (!transcriptCache || selectedTranscriptIds.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = selectedTranscriptIds.map(id => {
+                const t = transcriptCache.find(x => x.video_id === id);
+                const title = t ? (t.title.length > 40 ? t.title.slice(0, 40) + '...' : t.title) : id;
+                return `<span class="selected-chip">
+                    ${title}
+                    <span class="chip-remove" onclick="toggleTranscriptSelect('${id}')">&times;</span>
+                </span>`;
+            }).join('');
+        }
+
         async function generate() {
             const topic = topicInput.value.trim();
             if (!topic) return;
@@ -585,6 +733,7 @@
                         topic,
                         max_videos: document.getElementById('maxVideos').value,
                         time_range: document.getElementById('timeRange').value,
+                        selected_transcript_ids: selectedTranscriptIds,
                     }),
                 });
                 const {stream_id} = await res.json();
