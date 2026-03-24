@@ -428,6 +428,23 @@
             <button id="generateBtn" onclick="generate()">Generate</button>
         </div>
 
+        <div class="input-row" style="margin-top:-8px">
+            <select id="scriptStyle" title="Script narration style">
+                <option value="reporter">📰 Reporter</option>
+                <option value="storyteller" selected>🎭 Storyteller</option>
+                <option value="documentary">🎬 Documentary</option>
+                <option value="hype">🔥 Hype</option>
+            </select>
+            <select id="voiceSelect" title="Voice-over voice">
+                <option value="onyx">🎙 Onyx (deep male)</option>
+                <option value="nova">🎙 Nova (warm female)</option>
+                <option value="echo">🎙 Echo (smooth male)</option>
+                <option value="fable">🎙 Fable (British male)</option>
+                <option value="alloy">🎙 Alloy (neutral)</option>
+                <option value="shimmer">🎙 Shimmer (expressive female)</option>
+            </select>
+        </div>
+
         <div class="selected-chips" id="selectedChips"></div>
         <button class="transcript-toggle" id="transcriptToggle" onclick="toggleTranscripts()">📂 Saved Transcripts</button>
         <div class="transcript-panel" id="transcriptPanel"></div>
@@ -513,7 +530,6 @@
                 <button class="copy-btn" onclick="copyPrompt()">Copy Prompt</button>
                 <a class="copy-btn" id="downloadBtn" href="/download-remotion" style="display:none;text-decoration:none;text-align:center">Download ZIP</a>
                 <button class="video-btn" id="buildBtn" onclick="buildVideo()">Build Video</button>
-                <button class="copy-btn" id="voiceoverBtn" onclick="generateVoiceover()" style="display:none">🎙 Voice-Over</button>
             </div>
         </div>
     </div>
@@ -733,6 +749,7 @@
                         topic,
                         max_videos: document.getElementById('maxVideos').value,
                         time_range: document.getElementById('timeRange').value,
+                        style: document.getElementById('scriptStyle').value,
                         selected_transcript_ids: selectedTranscriptIds,
                     }),
                 });
@@ -890,7 +907,11 @@
                 const res = await fetch('/generate-video', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ script: lastScript, topic: lastTopic }),
+                    body: JSON.stringify({
+                        script: lastScript,
+                        topic: lastTopic,
+                        voice: document.getElementById('voiceSelect').value,
+                    }),
                 });
                 const { stream_id, error } = await res.json();
                 if (error) throw new Error(error);
@@ -905,9 +926,8 @@
                 evtSource.addEventListener('done', e => {
                     const data = JSON.parse(e.data);
                     addBuildLog(`✓ Generated ${data.files.length} component files`, 'log-done');
-                    addBuildLog('Click "Download ZIP" or run "git pull" to get files locally', 'log-done');
+                    addBuildLog('Click "Download ZIP" to get files locally', 'log-done');
                     document.getElementById('downloadBtn').style.display = 'inline-block';
-                    document.getElementById('voiceoverBtn').style.display = 'inline-block';
                 });
 
                 evtSource.addEventListener('error', e => {

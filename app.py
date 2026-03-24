@@ -109,7 +109,8 @@ def _send(q: queue.Queue, event: str, data: dict):
 
 # --- Pipeline worker ---
 def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queue,
-                     selected_transcript_ids: list[str] | None = None):
+                     selected_transcript_ids: list[str] | None = None,
+                     style: str = "reporter"):
     """Run the pipeline in a background thread, pushing SSE events."""
     try:
         # Load locally-selected transcripts first
@@ -179,8 +180,8 @@ def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queu
             video["summary"] = summarize_video(video["title"], video["transcript"])
 
         # Step 4: Compile
-        _send(q, "progress", {"step": 4, "message": "Compiling final script with Claude..."})
-        script = compile_script(topic, videos_with_transcripts)
+        _send(q, "progress", {"step": 4, "message": f"Compiling final script ({style} style) with Claude..."})
+        script = compile_script(topic, videos_with_transcripts, style=style)
 
         # Save
         path = save_script(topic, script, videos_with_transcripts)
@@ -199,8 +200,8 @@ def _pipeline_worker(topic: str, max_videos: int, time_range: str, q: queue.Queu
 
 
 # --- Video generation worker ---
-def _video_worker(script: str, topic: str, q: queue.Queue):
-    """Run full video generation pipeline: parse → images → components."""
+def _video_worker(script: str, topic: str, q: queue.Queue, voice: str = "onyx"):
+    """Run full video generation pipeline: parse → images → stock → TTS → sync → components."""
     try:
         def on_progress(msg):
             _send(q, "progress", {"step": 1, "message": msg})
@@ -215,33 +216,58 @@ def _video_worker(script: str, topic: str, q: queue.Queue):
         on_progress("Generating AI images for scenes...")
         generate_scene_images(scene_data["scenes"], topic, progress_callback=on_progress)
 
-        # Step 2b: Fetch stock photos/videos from Pexels
+        # Step 3: Fetch stock photos/videos from Pexels
         on_progress("Searching Pexels for stock media...")
         fetch_stock_media(scene_data["scenes"], progress_callback=on_progress)
         stock_count = sum(1 for s in scene_data["scenes"] if s.get("stockMedia"))
         on_progress(f"Stock media ready for {stock_count}/{len(scene_data['scenes'])} scenes")
 
-        # Re-inject audioPath for any existing voice-over MP3s
-        audio_dir = os.path.join(_app_dir, "remotion", "public", "audio")
-        if os.path.isdir(audio_dir):
-            for scene in scene_data["scenes"]:
-                mp3 = os.path.join(audio_dir, scene["id"] + ".mp3")
-                if os.path.exists(mp3):
-                    scene["audioPath"] = f"audio/{scene['id']}.mp3"
+        # Step 4: Generate voice-over audio (TTS)
+        on_progress(f"Generating voice-over ({voice} voice)...")
+        generate_voiceover(scene_data["scenes"], progress_callback=on_progress, voice=voice)
 
-        # Save scene data with correct imagePaths and audioPaths
+        # Step 5: Sync visual durations to actual audio length
+        from mutagen.mp3 import MP3
+        on_progress("Syncing visual timing to audio durations...")
+        current_frame = 0
+        for scene in scene_data["scenes"]:
+            ap = scene.get("audioPath")
+            if ap:
+                mp3_path = os.path.join(_app_dir, "remotion", "public", ap)
+                if os.path.exists(mp3_path):
+                    try:
+                        audio = MP3(mp3_path)
+                        audio_seconds = audio.info.length
+                        scene["audioDurationSeconds"] = round(audio_seconds, 2)
+                        new_frames = int(audio_seconds * 30) + 6  # +0.2s buffer
+                        old_frames = scene["durationFrames"]
+                        if new_frames != old_frames:
+                            scene["durationFrames"] = new_frames
+                            if scene.get("segments") and old_frames > 0:
+                                ratio = new_frames / old_frames
+                                running = 0
+                                for seg in scene["segments"]:
+                                    seg["startOffset"] = int(running)
+                                    seg["durationFrames"] = max(60, int(seg["durationFrames"] * ratio))
+                                    running += seg["durationFrames"]
+                    except Exception as e:
+                        on_progress(f"Warning: could not sync {ap}: {e}")
+            scene["startFrame"] = current_frame
+            current_frame += scene["durationFrames"]
+        scene_data["totalDurationFrames"] = current_frame
+        on_progress(f"Synced — total video: {current_frame // 30}s")
+
+        # Step 6: Save scene data with images + audio + synced durations
         data_dir = os.path.join(_app_dir, "remotion", "src", "data")
         os.makedirs(data_dir, exist_ok=True)
         with open(os.path.join(data_dir, "script.json"), "w", encoding="utf-8") as f:
             json.dump(scene_data, f, indent=2)
 
-        # Step 3: Build prompt with correct imagePaths
+        # Step 7: Build prompt and generate Remotion components
         prompt = REMOTION_PROMPT_TEMPLATE.format(
             topic=topic,
             scenes_json=json.dumps(scene_data, indent=2),
         )
-
-        # Step 4: Generate Remotion components via Claude
         on_progress("Generating Remotion components...")
         files = generate_video_components(prompt, progress_callback=on_progress)
         _send(q, "done", {"files": files})
@@ -373,12 +399,13 @@ def generate_video():
     data = request.json
     script = data.get("script", "").strip()
     topic = data.get("topic", "").strip()
+    voice = data.get("voice", "onyx")
 
     if not script or not topic:
         return {"error": "Script and topic are required"}, 400
 
     qid, q = _new_queue()
-    thread = threading.Thread(target=_video_worker, args=(script, topic, q), daemon=True)
+    thread = threading.Thread(target=_video_worker, args=(script, topic, q, voice), daemon=True)
     thread.start()
 
     return {"stream_id": qid}
@@ -479,12 +506,13 @@ def generate():
     max_videos = max(1, min(max_videos, 20))
 
     selected_ids = data.get("selected_transcript_ids", [])
+    style = data.get("style", "reporter")
 
     qid, q = _new_queue()
     thread = threading.Thread(
         target=_pipeline_worker,
         args=(topic, max_videos, time_range, q),
-        kwargs={"selected_transcript_ids": selected_ids},
+        kwargs={"selected_transcript_ids": selected_ids, "style": style},
         daemon=True,
     )
     thread.start()
