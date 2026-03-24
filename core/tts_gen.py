@@ -49,13 +49,10 @@ def generate_voiceover(
 
     os.makedirs(AUDIO_DIR, exist_ok=True)
 
-    # Clear old audio files not matching current scene IDs
-    current_ids = {s.get("id", f"scene-{i}") for i, s in enumerate(scenes)}
+    # Clear ALL old audio — common IDs like hook/intro/outro collide across topics
     for existing in os.listdir(AUDIO_DIR):
         if existing.endswith(".mp3"):
-            stem = existing[:-4]
-            if stem not in current_ids:
-                os.remove(os.path.join(AUDIO_DIR, existing))
+            os.remove(os.path.join(AUDIO_DIR, existing))
 
     def _progress(msg: str):
         if progress_callback:

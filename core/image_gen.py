@@ -46,13 +46,10 @@ def generate_scene_images(
 
     os.makedirs(IMAGES_DIR, exist_ok=True)
 
-    # Clear old images that don't match current scene IDs to prevent collisions
-    current_ids = {s.get("id", f"scene-{i}") for i, s in enumerate(scenes)}
+    # Clear ALL old images — common IDs like hook/intro/outro collide across topics
     for existing in os.listdir(IMAGES_DIR):
         if existing.endswith(".png"):
-            stem = existing[:-4]  # Remove .png
-            if stem not in current_ids:
-                os.remove(os.path.join(IMAGES_DIR, existing))
+            os.remove(os.path.join(IMAGES_DIR, existing))
 
     def _progress(msg: str):
         if progress_callback:
